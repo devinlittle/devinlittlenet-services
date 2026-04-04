@@ -1,0 +1,15 @@
+# Build Artifacts
+/target/
+node_modules/
+
+# OS Specific
+.DS_STORE
+
+# Rust Stuff
+**/*.rs.bk
+
+# Editor Specific
+*.swp
+*.swo
+*~
+docker-compose.yaml

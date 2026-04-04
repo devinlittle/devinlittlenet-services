@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gradegetter_backend
+spec:
+  replicas: {{ .Values.gradegetter_backend.replicaCount }}
+  selector:
+    matchLabels:
+      app: gradegetter_backend
+  template:
+    metadata:
+      labels:
+        app: gradegetter_backend
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox
+          command:
+            - sh
+            - -c
+            - until nc -z {{ .Release.Name }}-postgresql 5432; do echo "waiting"; sleep 2; done
+
+        - name: run-migrations
+          image: "{{ .Values.gradegetter_backend.image.repository }}:{{ .Values.gradegetter_backend.image.tag }}"
+          command: ["/bin/sqlx", "migrate", "run", "--source", "/migrations"]
+          env:
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.gg.database }}"
+      containers:
+        - name: gradegetter_backend
+          image: "{{ .Values.gradegetter_backend.image.repository }}:{{ .Values.gradegetter_backend.image.tag }}"
+          imagePullPolicy: {{ .Values.gradegetter_backend.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.gradegetter_backend.port }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gradegetter_backend.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          env:
+            - name: PORT
+              value: {{ .Values.gradegetter_backend.port | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.gradegetter_backend.env.RUST_LOG }}
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.gg.database }}"
+            - name: HASH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: HASH_SECRET
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: JWT_SECRET
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: ENCRYPTION_KEY

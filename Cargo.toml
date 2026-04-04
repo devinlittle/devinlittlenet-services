@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = [
+"auth_backend/","gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/"]
+
+
+[workspace.dependencies]
+tokio = {version = "1", features = ["full"]}
+axum = {version = "0.8.8", features = ["macros"]}
+axum-extra = "0.12.2"
+axum-server = {version = "0.8", features = ["tls-rustls"]}
+hyper = {version = "1.8.0"}
+hyper-tls = "0.6.0"
+tower-http = { version = "0.6.8", features = ["cors"]}
+tower = "0.5.2"
+utoipa = {version = "5.4", features = ["axum_extras", "time", "uuid"]}
+utoipa-swagger-ui = {version = "9.0", features = ["axum"]}
+rustls = { version = "0.23.35", features = ["ring"] }
+ring = "0.17.14"
+reqwest = {version = "0.12"}
+serde = {version = "1", features = ["derive"]}
+serde_json = {version = "1"}
+sha2 = {version = "0.10"}
+sqlx = {version = "0.8.6"}
+uuid = {version = "1.19", features = ["v4", "serde"]}
+time = "0.3.44"
+jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
+tracing = "0.1.44"
+tracing-subscriber = {version = "0.3.22", features = ["env-filter"] }
+anyhow = "1.0"
+dotenvy = "0.15.7"
+constant_time_eq = "0.4.2"
+regex = "1"
+scraper = "0.26"
+aes-gcm = "0.10"
+aes = "0.8.4"
+rand = "0.9"
+base64 = "0.22"
+once_cell = "1.21"
+crypto_utils = { path = "./gradegetter/crypto_utils" }
+#totp-rs = { version = "5.7.0", features = ["qr"]}  # used to be in here for something else.
+
+[profile.release]
+panic = "abort" # Strip expensive panic clean-up logic
+codegen-units = 1 # Compile crates one after another so the compiler can optimize better
+lto = true # Enables link to optimizations
+opt-level = 3 # Use all optimizations for best performance
+strip = true # Remove debug symbols
+
+

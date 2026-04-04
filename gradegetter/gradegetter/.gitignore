@@ -1,0 +1,6 @@
+# env files and secerts
+.env
+.env.*
+
+# Doesnt ignore the env.template file
+!*.env.template 

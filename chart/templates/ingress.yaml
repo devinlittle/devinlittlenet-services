@@ -1,0 +1,36 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-ingress
+  annotations:
+    {{- if .Values.ingress.additionalAnnotations }}
+    {{- toYaml .Values.ingress.additionalAnnotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.class }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname }}
+      secretName: {{ .Values.ingress.tlsSecret }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hostname }}
+      http:
+        paths:
+          - path: /gradegetter/
+            pathType: Prefix
+            backend:
+              service:
+                name: gradegetter_backend
+                port:
+                  number: 3002
+          - path: /auth/
+            pathType: Prefix
+            backend:
+              service:
+                name: auth_backend
+                port:
+                  number: 3000
+{{- end }}
