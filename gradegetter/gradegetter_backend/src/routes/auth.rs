@@ -1,5 +1,5 @@
 use anyhow::Result;
-use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{extract::State, http::StatusCode, Extension, Json};
 use serde::Deserialize;
 use tracing::{error, info};
 use utoipa::ToSchema;
@@ -87,40 +87,6 @@ pub async fn foward_to_gradegetter(
             axum::http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(())
-}
-
-#[utoipa::path(
-    delete,
-    path = "/auth/internal_delete",
-    security(
-        ("bearer_auth" = [])
-    ),
-    responses(
-        (status = 200, description = "Deleted User", body = String),
-        (status = 401, description = "Credentials Incorrect"),
-        (status = 404, description = "Not Found"),
-        (status = 500, description = "Interal Server Error")
-    ),
-    tag = "user_auth"
-)]
-pub async fn delete_handler(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthenticatedUser>,
-) -> impl IntoResponse {
-    match sqlx::query!("DELETE FROM service_users WHERE id = $1", user.uuid)
-        .execute(&state.pool)
-        .await
-    {
-        Ok(result) if result.rows_affected() > 0 => {
-            info!("deleted user: {}", user.username);
-            axum::http::StatusCode::OK
-        }
-        Ok(_) => StatusCode::NOT_FOUND,
-        Err(err) => {
-            error!("database error: {:?}", err);
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
 }
 
 #[utoipa::path(

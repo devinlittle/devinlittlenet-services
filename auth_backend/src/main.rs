@@ -1,4 +1,4 @@
-use axum::{http::HeaderValue, Router};
+use axum::Router;
 use hyper::header::{AUTHORIZATION, CONTENT_TYPE};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
@@ -6,7 +6,7 @@ use tokio::signal::{
     self,
     unix::{signal, SignalKind},
 };
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -24,8 +24,13 @@ async fn main() {
         .install_default()
         .expect("failed to install rustls cryptoi provider");
 
+    let origins = [
+        "http://127.0.0.1:5173".parse().unwrap(),
+        "https://devinlittle.net:443".parse().unwrap(),
+    ];
+
     let cors = CorsLayer::new()
-        .allow_origin("http://127.0.0.1:5173".parse::<HeaderValue>().unwrap())
+        .allow_origin(origins)
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,

@@ -34,7 +34,7 @@ pub struct RegisterInput {
 
 #[utoipa::path(
     post,
-    path = "/auth/register",
+    path = "/register",
     request_body = RegisterInput,
     responses(
         (status = 200, description = "Registers User!", body = String),
@@ -83,7 +83,7 @@ pub struct LoginOutput {
     path = "/login",
     request_body = LoginInput,
     responses(
-        (status = 200, description = "Returns Valid JWT for User", body = String),
+        (status = 200, description = "Returns Valid JWT for User and SET_COOKIE header for refreshing purposes", body = String),
         (status = 401, description = "Credentials Incorrect"),
         (status = 500, description = "Interal Server Error")
     ),
@@ -122,7 +122,7 @@ pub async fn login_handler(
         let refresh_token = generate_random_string();
 
         let refresh_cookie = format!(
-            "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh; Max-Age={}",
+            "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age={}",
             refresh_token,
             60 * 60 * 24 * 365 // this is a year - Devin Little
         );
@@ -146,6 +146,51 @@ pub async fn login_handler(
 }
 
 #[utoipa::path(
+    post,
+    path = "/logout",
+    responses(
+        (status = 200, description = "Sends back an empty, expired cookie to client ", body = String),
+        (status = 401, description = "the refresh_token cookie the user send is messed tf up"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn logout_handler(
+    State(pool): State<PgPool>,
+    TypedHeader(cookies): TypedHeader<Cookie>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let refresh_cookie = cookies.get("refresh_token").unwrap_or_default();
+
+    let query = format!(
+        "DELETE FROM refresh_tokens WHERE token_hash = '{}'",
+        hash(refresh_cookie)
+    );
+
+    tracing::debug!("{query}");
+
+    if sqlx::query(&query)
+        .execute(&pool)
+        .await
+        .map_err(|err| {
+            tracing::error!("{}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+        .is_ok()
+    {
+        let refresh_cookie = "refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
+
+        let mut headers = HeaderMap::new();
+
+        headers.insert(SET_COOKIE, HeaderValue::from_str(refresh_cookie).unwrap());
+
+        info!(r#"User logged out sucessfully"#);
+        Ok((StatusCode::OK, headers).into_response())
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+/*#[utoipa::path(
     get,
     path = "/auth/validate",
     security(
@@ -160,11 +205,13 @@ pub async fn login_handler(
 )]
 pub async fn validate_token() -> Result<(), StatusCode> {
     Ok(())
-}
+} */
 
+// HACK: this only deletes user table data from the auth db
+//       in the future I should make an internal request to delete user from other services' tables
 #[utoipa::path(
     delete,
-    path = "/auth/delete",
+    path = "/delete",
     security(
         ("bearer_auth" = [])
     ),
@@ -197,18 +244,15 @@ pub async fn delete_handler(
 }
 
 #[utoipa::path(
-    get,
-    path = "/health",
+    delete,
+    path = "/refresh",
     responses(
-        (status = 200, description = "Service is alive"),
+        (status = 200, description = "sent back jwt and refresh_cookie", body = String),
+        (status = 401, description = "cookie messed tf up"),
+        (status = 500, description = "Interal Server Error")
     ),
-    tag = "none"
+    tag = "user_auth"
 )]
-
-pub async fn health() -> Result<(), axum::http::StatusCode> {
-    Ok(())
-}
-
 pub async fn refresh_handler(
     State(pool): State<PgPool>,
     TypedHeader(cookies): TypedHeader<Cookie>,
@@ -245,7 +289,10 @@ pub async fn refresh_handler(
     )
     .fetch_optional(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        tracing::error!("error updating refresh_tokens: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let uuid = match refresh_token_query {
         Some(re) => re.user_id,
@@ -258,7 +305,10 @@ pub async fn refresh_handler(
     )
     .fetch_one(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        tracing::error!("error grabbing user information from db: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let sub = user.id.to_string();
     let username = user.username;
@@ -307,7 +357,10 @@ pub fn generate_jwt(
         &claims,
         &EncodingKey::from_secret(jwt_secret.as_ref()),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        tracing::error!("error encoding jwt, {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(token)
 }
@@ -330,6 +383,22 @@ pub async fn insert_refresh_token(
     )
     .execute(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        tracing::error!("erorr adding refreh_token to db {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(())
+}
+
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Service is alive"),
+    ),
+    tag = "none"
+)]
+
+pub async fn health() -> Result<(), axum::http::StatusCode> {
     Ok(())
 }

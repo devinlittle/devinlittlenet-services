@@ -1,6 +1,6 @@
 use axum::{
-    Router,
     routing::{delete, get, post},
+    Router,
 };
 use sqlx::PgPool;
 use std::{
@@ -19,12 +19,14 @@ pub mod internal;
 #[openapi(
       paths(
         // Auth paths
-        crate::routes::auth::delete_handler,
         crate::routes::auth::foward_to_gradegetter,
         crate::routes::auth::schoology_credentials_handler,
         crate::routes::auth::health,
         // Grade path
         crate::routes::grades::grades_handler,
+        // Internal Paths
+        crate::routes::internal::invalidate_user,
+        crate::routes::internal::delete_handler,
     ),
     components(
         schemas(
@@ -35,7 +37,8 @@ pub mod internal;
     modifiers(&JwtBearer),
     tags(
         (name = "user_auth", description = "Authentication endpoints"),
-        (name = "grades", description = "Grade Endpoints")
+        (name = "grades", description = "Grade Endpoints"),
+        (name = "internal", description = "Internal Endpoints")
     )
 )]
 pub struct DaApiDoc;
@@ -72,7 +75,6 @@ pub fn create_routes(pool: PgPool) -> Router {
 
     let routes_with_middleware = Router::new()
         // Auth Routes
-        .route("/auth/internal_delete", delete(auth::delete_handler))
         .route("/auth/forward", get(auth::foward_to_gradegetter))
         .route(
             "/auth/schoology/credentials",
@@ -90,6 +92,7 @@ pub fn create_routes(pool: PgPool) -> Router {
             "/internal/invalidate/{uuid}",
             get(internal::invalidate_user),
         )
+        .route("/internal/delete/{uuid}", delete(internal::delete_handler))
         .layer(axum::middleware::from_fn(
             crate::middleware::internal::basic_auth,
         ));

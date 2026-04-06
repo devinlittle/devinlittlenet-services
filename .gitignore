@@ -1,6 +1,7 @@
 # Build Artifacts
 /target/
 node_modules/
+recordings/
 
 # OS Specific
 .DS_STORE

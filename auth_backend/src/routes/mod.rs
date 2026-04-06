@@ -15,8 +15,9 @@ pub mod internal;
         // Auth paths
         crate::routes::auth::register_handler,
         crate::routes::auth::login_handler,
+        crate::routes::auth::logout_handler,
+        crate::routes::auth::refresh_handler,
         crate::routes::auth::delete_handler,
-        crate::routes::auth::validate_token,
         crate::routes::auth::health,
     ),
     components(
@@ -30,6 +31,7 @@ pub mod internal;
     modifiers(&JwtBearer),
     tags(
         (name = "user_auth", description = "Authentication endpoints"),
+        (name = "internal", description = "internal routes only meant for use between services"),
     )
 )]
 pub struct DaApiDoc;
@@ -56,11 +58,11 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/register", post(auth::register_handler))
         .route("/login", post(auth::login_handler))
         .route("/refresh", post(auth::refresh_handler))
+        .route("/logout", get(auth::logout_handler))
         .route("/health", get(auth::health));
 
     let routes_with_middleware = Router::new()
         .route("/delete", delete(auth::delete_handler))
-        .route("/validate", get(auth::validate_token))
         .layer(axum::middleware::from_fn(crate::middleware::jwt::jwt_auth));
 
     let internal_routes = Router::new()
