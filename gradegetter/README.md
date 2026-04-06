@@ -1,6 +1,6 @@
 # Grade Getter
 
-A Rust powered monorepo to scrape Schoology grades, encrypt important information, and serve clean JSON. 
+A Rust/Javascript monorepo to scrape Schoology grades, encrypt important information, and serve clean JSON. 
 
 ---
 

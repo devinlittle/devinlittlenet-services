@@ -114,7 +114,7 @@ pub async fn login_handler(
         let sub = user.id.to_string();
         let username = req.username.to_string();
         let iat = OffsetDateTime::now_utc();
-        let exp = iat + time::Duration::days(365);
+        let exp = iat + time::Duration::minutes(15);
 
         let access_token = generate_jwt(sub, username, user.roles, iat, exp)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -313,13 +313,13 @@ pub async fn refresh_handler(
     let sub = user.id.to_string();
     let username = user.username;
     let iat = OffsetDateTime::now_utc();
-    let exp = iat + time::Duration::days(365);
+    let exp = iat + time::Duration::minutes(15);
 
     let access_token = generate_jwt(sub, username, user.roles, iat, exp)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let refresh_cookie = format!(
-        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/auth/refresh; Max-Age={}",
+        "refresh_token={}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age={}",
         refresh_token,
         60 * 60 * 24 * 365 // this is a year - Devin Little
     );

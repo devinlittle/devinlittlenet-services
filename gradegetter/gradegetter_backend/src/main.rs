@@ -4,9 +4,9 @@ use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
 use tokio::signal::{
     self,
-    unix::{SignalKind, signal},
+    unix::{signal, SignalKind},
 };
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -23,15 +23,21 @@ async fn main() {
         .install_default()
         .expect("failed to install rustls cryptoi provider");
 
+    let origins = [
+        "http://127.0.0.1:5173".parse().unwrap(),
+        "https://devinlittle.net:443".parse().unwrap(),
+    ];
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(origins)
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
             axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers([AUTHORIZATION, CONTENT_TYPE]);
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+        .allow_credentials(true);
 
     let database_string = dotenvy::var("DATABASE_URL").expect("DATABASE_URL env_var not found");
 
