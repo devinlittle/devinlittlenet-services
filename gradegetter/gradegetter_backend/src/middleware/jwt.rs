@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -12,6 +10,7 @@ use axum_extra::{
 };
 use jsonwebtoken::{DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 

@@ -242,7 +242,7 @@ pub async fn delete_handler(
             let client = reqwest::Client::new();
 
             let _ = client
-                .get(format!(
+                .delete(format!(
                     "http://gradegetter_backend:3002/internal/delete/{}",
                     user.uuid
                 ))
@@ -470,7 +470,7 @@ pub async fn revoke_all_sessions(
 
 #[utoipa::path(
     delete,
-    path = "/sessions/revoke/:id",
+    path = "/sessions/revoke/{id}",
     params(
         ("id", description = "the id of the specific refesh_token")
     ),
