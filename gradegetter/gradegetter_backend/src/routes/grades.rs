@@ -24,7 +24,7 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Value>, axum::http::StatusCode> {
-    if user.role != "devin" || user.role != "trusted" {
+    if user.role != "devin" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
     }
 
