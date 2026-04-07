@@ -1,11 +1,16 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::{HeaderValue, StatusCode},
     response::IntoResponse,
     Extension, Json,
 };
-use axum_extra::{headers::Cookie, TypedHeader};
+use axum_extra::{
+    headers::{Cookie, UserAgent},
+    TypedHeader,
+};
 use hyper::{header::SET_COOKIE, HeaderMap};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
@@ -17,7 +22,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    middleware::jwt::{AuthenticatedUser, Claims},
+    middleware::jwt::{jwt_numeric_date, AuthenticatedUser, Claims},
     util::{
         hash::{hash, validate},
         random::generate_random_string,
@@ -91,6 +96,7 @@ pub struct LoginOutput {
 )]
 pub async fn login_handler(
     State(pool): State<PgPool>,
+    TypedHeader(user_agent): TypedHeader<UserAgent>,
     Json(req): Json<LoginInput>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let row = sqlx::query_as!(
@@ -126,7 +132,7 @@ pub async fn login_handler(
             refresh_token,
             60 * 60 * 24 * 365 // this is a year - Devin Little
         );
-        insert_refresh_token(pool, user.id, &refresh_token)
+        insert_refresh_token(pool, user.id, &refresh_token, user_agent.to_string())
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -207,8 +213,6 @@ pub async fn validate_token() -> Result<(), StatusCode> {
     Ok(())
 } */
 
-// HACK: this only deletes user table data from the auth db
-//       in the future I should make an internal request to delete user from other services' tables
 #[utoipa::path(
     delete,
     path = "/delete",
@@ -226,25 +230,43 @@ pub async fn validate_token() -> Result<(), StatusCode> {
 pub async fn delete_handler(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, StatusCode> {
+    let internal_api_key =
+        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+
     match sqlx::query!("DELETE FROM users WHERE id = $1", user.uuid)
         .execute(&pool)
         .await
     {
         Ok(result) if result.rows_affected() > 0 => {
+            let client = reqwest::Client::new();
+
+            let _ = client
+                .get(format!(
+                    "http://gradegetter_backend:3002/internal/delete/{}",
+                    user.uuid
+                ))
+                .header(
+                    "Authorization",
+                    format!("Basic {}", internal_api_key.as_str()),
+                )
+                .send()
+                .await
+                .map_err(|err| tracing::error!("failed to delete user from gradegetter: {}", err));
+
             info!("deleted user: {}", user.username);
-            axum::http::StatusCode::OK
+            Ok((axum::http::StatusCode::OK).into_response())
         }
-        Ok(_) => StatusCode::NOT_FOUND,
+        Ok(_) => Err(StatusCode::NOT_FOUND),
         Err(err) => {
             error!("database error: {:?}", err);
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+            Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
 
 #[utoipa::path(
-    delete,
+    post,
     path = "/refresh",
     responses(
         (status = 200, description = "sent back jwt and refresh_cookie", body = String),
@@ -256,6 +278,7 @@ pub async fn delete_handler(
 pub async fn refresh_handler(
     State(pool): State<PgPool>,
     TypedHeader(cookies): TypedHeader<Cookie>,
+    TypedHeader(user_agent): TypedHeader<UserAgent>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let cookie_refresh_token = cookies.get("refresh_token").unwrap_or_default();
 
@@ -324,7 +347,7 @@ pub async fn refresh_handler(
         60 * 60 * 24 * 365 // this is a year - Devin Little
     );
 
-    insert_refresh_token(pool.clone(), uuid, &refresh_token)
+    insert_refresh_token(pool.clone(), uuid, &refresh_token, user_agent.to_string())
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -370,16 +393,18 @@ pub async fn insert_refresh_token(
     pool: PgPool,
     uuid: Uuid,
     refresh_token: &String,
+    user_agent: String,
 ) -> Result<(), StatusCode> {
     let expires_at = PrimitiveDateTime::new(
         OffsetDateTime::now_utc().date(),
         OffsetDateTime::now_utc().time(),
     ) + time::Duration::days(365);
     let _ = sqlx::query!(
-        r#"INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)"#,
+        r#"INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent) VALUES ($1, $2, $3, $4)"#,
         uuid,
         hash(refresh_token.as_str()),
-        expires_at
+        expires_at,
+        user_agent
     )
     .execute(&pool)
     .await
@@ -398,7 +423,151 @@ pub async fn insert_refresh_token(
     ),
     tag = "none"
 )]
-
 pub async fn health() -> Result<(), axum::http::StatusCode> {
     Ok(())
+}
+
+#[utoipa::path(
+    delete,
+    path = "/sessions/revoke",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "revoked all sessions", body = String),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 404, description = "Not Found"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn revoke_all_sessions(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Result<impl IntoResponse, StatusCode> {
+    match sqlx::query!(
+        "DELETE FROM refresh_tokens
+        WHERE replaced_by_token IS NULL
+        AND user_id = $1",
+        user.uuid
+    )
+    .execute(&pool)
+    .await
+    {
+        Ok(result) => {
+            if result.rows_affected() > 0 {
+                Ok("sessions GONE".into_response())
+            } else {
+                Err(StatusCode::NOT_MODIFIED)
+            }
+        }
+        Err(err) => {
+            tracing::error!("error revoking all sessions: {}", err);
+            Err(StatusCode::UNAUTHORIZED)
+        }
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/sessions/revoke/:id",
+    params(
+        ("id", description = "the id of the specific refesh_token")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "revoked specific token", body = String),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 404, description = "Not Found"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn revoke_specific_session(
+    State(pool): State<PgPool>,
+    Path(path): Path<Uuid>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Result<impl IntoResponse, StatusCode> {
+    match sqlx::query!(
+        "DELETE FROM refresh_tokens
+        WHERE replaced_by_token IS NULL
+        AND id = $1
+        AND user_id = $2",
+        path,
+        user.uuid,
+    )
+    .execute(&pool)
+    .await
+    {
+        Ok(result) => {
+            if result.rows_affected() > 0 {
+                Ok("sessions GONE".into_response())
+            } else {
+                Err(StatusCode::NOT_MODIFIED)
+            }
+        }
+        Err(err) => {
+            tracing::error!("error revoking all sessions: {}", err);
+            Err(StatusCode::UNAUTHORIZED)
+        }
+    }
+}
+
+#[derive(Eq, Hash, PartialEq, Serialize, ToSchema)]
+pub struct ActiveSessions {
+    session_id: Uuid,
+    #[serde(with = "jwt_numeric_date")]
+    expires_at: OffsetDateTime,
+    user_agent: String,
+}
+
+#[utoipa::path(
+    delete,
+    path = "/sessions/list_all",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "shows all the active sessions", body = ActiveSessions),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 404, description = "Not Found"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn list_active_sessions(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let sessions = sqlx::query!(
+        "SELECT id, expires_at, user_agent FROM refresh_tokens
+        WHERE user_id = $1
+        AND replaced_by_token IS NULL",
+        user.uuid
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|err| {
+        tracing::error!("failed to grab all active sessions: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let mut sessions_hashset: HashSet<ActiveSessions> = HashSet::new();
+
+    for session in &sessions {
+        sessions_hashset.insert(ActiveSessions {
+            session_id: session.id,
+            expires_at: session.expires_at.assume_utc(),
+            user_agent: session.user_agent.clone(),
+        });
+    }
+
+    let output = serde_json::to_value(sessions_hashset).map_err(|err| {
+        tracing::error!("failed to seriliaze sessions_hashset: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok((Json(output)).into_response())
 }

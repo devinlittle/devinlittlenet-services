@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM refresh_tokens\n        WHERE replaced_by_token IS NULL\n        AND user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "684fab24e49992a0f075536fa75e83693e0305cfcf3bbb54ab156cfd0d1fd500"
+}

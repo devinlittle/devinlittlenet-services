@@ -26,7 +26,8 @@ async fn main() {
 
     let origins = [
         "http://127.0.0.1:5173".parse().unwrap(),
-        "https://devinlittle.net:443".parse().unwrap(),
+        "https://devinlittle.net".parse().unwrap(),
+        "https://api.devinlittle.net".parse().unwrap(),
     ];
 
     let cors = CorsLayer::new()

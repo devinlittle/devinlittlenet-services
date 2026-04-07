@@ -6,6 +6,7 @@ CREATE TABLE refresh_tokens (
     created_at  TIMESTAMP DEFAULT NOW(),
     revoked_at  TIMESTAMP NULL,
     replaced_by_token VARCHAR(255) NULL,
+    user_agent TEXT NOT NULL,
 
     CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

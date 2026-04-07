@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::routes::AppState;
 
 #[utoipa::path(
-    delete,
+    get,
     path = "/internal/invalidate/{uuid}",
     params(
         ("uuid", description = "pretty easy to understand what this means.")

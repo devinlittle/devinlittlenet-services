@@ -19,6 +19,11 @@ pub mod internal;
         crate::routes::auth::refresh_handler,
         crate::routes::auth::delete_handler,
         crate::routes::auth::health,
+        crate::routes::auth::list_active_sessions,
+        crate::routes::auth::revoke_specific_session,
+        crate::routes::auth::revoke_all_sessions,
+        // Internal Paths
+        crate::routes::internal::get_user_roles
     ),
     components(
         schemas(
@@ -63,6 +68,12 @@ pub fn create_routes(pool: PgPool) -> Router {
 
     let routes_with_middleware = Router::new()
         .route("/delete", delete(auth::delete_handler))
+        .route("/sessions/list_all", get(auth::list_active_sessions))
+        .route(
+            "/sessions/revoke/{id}",
+            delete(auth::revoke_specific_session),
+        )
+        .route("/sessions/revoke", delete(auth::revoke_all_sessions))
         .layer(axum::middleware::from_fn(crate::middleware::jwt::jwt_auth));
 
     let internal_routes = Router::new()
