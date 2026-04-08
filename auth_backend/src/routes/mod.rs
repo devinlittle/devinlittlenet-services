@@ -3,7 +3,10 @@ use axum::{
     Router,
 };
 use sqlx::PgPool;
-use utoipa::OpenApi;
+use utoipa::{
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
+    OpenApi,
+};
 use utoipa_swagger_ui::SwaggerUi;
 
 pub mod auth;
@@ -33,7 +36,7 @@ pub mod internal;
             crate::middleware::jwt::Claims,
         )
     ),
-    modifiers(&JwtBearer),
+    modifiers(&JwtBearer, &CookieAuth, &InternalAuth),
     tags(
         (name = "user_auth", description = "Authentication endpoints"),
         (name = "internal", description = "internal routes only meant for use between services"),
@@ -42,6 +45,8 @@ pub mod internal;
 pub struct DaApiDoc;
 
 struct JwtBearer;
+struct CookieAuth;
+struct InternalAuth;
 
 impl utoipa::Modify for JwtBearer {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
@@ -54,6 +59,28 @@ impl utoipa::Modify for JwtBearer {
                     ),
                 ),
             )
+        }
+    }
+}
+
+impl utoipa::Modify for CookieAuth {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "cookie_auth",
+                SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("refresh_token"))),
+            );
+        }
+    }
+}
+
+impl utoipa::Modify for InternalAuth {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "internal_auth",
+                SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Basic).build()),
+            );
         }
     }
 }

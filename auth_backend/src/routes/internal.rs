@@ -13,6 +13,9 @@ use uuid::Uuid;
     params(
         ("uuid", description = "pretty easy to understand what this means.")
     ),
+    security(
+        ("internal_auth" = []),
+    ),
     responses(
         (status = 200, description = "sends back in json the users roles", body = String),
         (status = 500, description = "Interal Server Error")

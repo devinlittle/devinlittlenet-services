@@ -154,6 +154,9 @@ pub async fn login_handler(
 #[utoipa::path(
     post,
     path = "/logout",
+    security(
+        ("cookie_auth" = [])
+    ),
     responses(
         (status = 200, description = "Sends back an empty, expired cookie to client ", body = String),
         (status = 401, description = "the refresh_token cookie the user send is messed tf up"),
@@ -268,6 +271,9 @@ pub async fn delete_handler(
 #[utoipa::path(
     post,
     path = "/refresh",
+    security(
+        ("cookie_auth" = [])
+    ),
     responses(
         (status = 200, description = "sent back jwt and refresh_cookie", body = String),
         (status = 401, description = "cookie messed tf up"),
@@ -529,7 +535,8 @@ pub struct ActiveSessions {
     delete,
     path = "/sessions/list_all",
     security(
-        ("bearer_auth" = [])
+        ("bearer_auth" = []),
+        ("cookie_auth" = [])
     ),
     responses(
         (status = 200, description = "shows all the active sessions", body = ActiveSessions),
