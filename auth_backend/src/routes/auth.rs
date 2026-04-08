@@ -522,7 +522,7 @@ pub async fn revoke_specific_session(
     }
 }
 
-#[derive(Eq, Hash, PartialEq, Serialize, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct ActiveSessions {
     session_id: Uuid,
     #[serde(with = "jwt_numeric_date")]
@@ -532,14 +532,14 @@ pub struct ActiveSessions {
 }
 
 #[utoipa::path(
-    delete,
+    get,
     path = "/sessions/list_all",
     security(
         ("bearer_auth" = []),
         ("cookie_auth" = [])
     ),
     responses(
-        (status = 200, description = "shows all the active sessions", body = ActiveSessions),
+        (status = 200, description = "shows all the active sessions", body = Vec<ActiveSessions>),
         (status = 401, description = "Credentials Incorrect"),
         (status = 404, description = "Not Found"),
         (status = 500, description = "Interal Server Error")
@@ -564,23 +564,22 @@ pub async fn list_active_sessions(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let mut sessions_hashset: HashSet<ActiveSessions> = HashSet::new();
-
-    for session in &sessions {
-        sessions_hashset.insert(ActiveSessions {
+    let sessions: Vec<ActiveSessions> = sessions
+        .iter()
+        .map(|session| ActiveSessions {
             session_id: session.id,
             expires_at: session.expires_at.assume_utc(),
             user_agent: session.user_agent.clone(),
             is_current: {
                 hash(cookies.get("refresh_token").unwrap_or_default()) == session.token_hash
             },
-        });
-    }
+        })
+        .collect();
 
-    let output = serde_json::to_value(sessions_hashset).map_err(|err| {
+    let output = serde_json::to_value(sessions).map_err(|err| {
         tracing::error!("failed to seriliaze sessions_hashset: {}", err);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok((Json(output)).into_response())
+    Ok(Json(output).into_response())
 }

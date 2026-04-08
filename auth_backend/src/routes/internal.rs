@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[utoipa::path(
-    delete,
+    get,
     path = "/internal/users/{uuid}/roles",
     params(
         ("uuid", description = "pretty easy to understand what this means.")
