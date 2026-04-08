@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
-"auth_backend/", "gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/"]
+"auth_backend/", "gloss_backend/", "gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/"]
 
 
 [workspace.dependencies]
@@ -9,13 +9,14 @@ tokio = {version = "1", features = ["full"]}
 axum = {version = "0.8.8", features = ["macros"]}
 axum-extra = "0.12.2"
 axum-server = {version = "0.8", features = ["tls-rustls"]}
+axum-prometheus = "0.10"
 hyper = {version = "1.9.0"}
 hyper-tls = "0.6.0"
 tower-http = { version = "0.6.8", features = ["cors"]}
-tower = "0.5.2"
+tower = "0.5.3"
 utoipa = {version = "5.4", features = ["axum_extras", "time", "uuid"]}
 utoipa-swagger-ui = {version = "9.0", features = ["axum"]}
-rustls = { version = "0.23.35", features = ["ring"] }
+rustls = { version = "0.23.37", features = ["ring"] }
 ring = "0.17.14"
 reqwest = {version = "0.12"}
 serde = {version = "1", features = ["derive"]}

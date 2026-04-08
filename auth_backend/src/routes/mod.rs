@@ -2,6 +2,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -86,11 +87,14 @@ impl utoipa::Modify for InternalAuth {
 }
 
 pub fn create_routes(pool: PgPool) -> Router {
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+
     let routes_without_middleware = Router::new()
         .route("/register", post(auth::register_handler))
         .route("/login", post(auth::login_handler))
         .route("/refresh", post(auth::refresh_handler))
         .route("/logout", get(auth::logout_handler))
+        .route("/metrics", get(|| async move { metric_handle.render() }))
         .route("/health", get(auth::health));
 
     let routes_with_middleware = Router::new()
@@ -118,4 +122,5 @@ pub fn create_routes(pool: PgPool) -> Router {
         .merge(routes_without_middleware)
         .merge(SwaggerUi::new("/swegger-ui").url("/api-docs/openapi.json", DaApiDoc::openapi()))
         .with_state(pool)
+        .layer(prometheus_layer)
 }

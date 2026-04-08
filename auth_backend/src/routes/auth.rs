@@ -116,7 +116,7 @@ pub async fn login_handler(
         None => return Err(axum::http::StatusCode::UNAUTHORIZED), // User not found
     };
 
-    if verify_password(req.password.as_str(), &user.password_hash)? {
+    if verify_password(req.password.as_str(), &user.password_hash) {
         let sub = user.id.to_string();
         let username = req.username.to_string();
         let iat = OffsetDateTime::now_utc();

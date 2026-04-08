@@ -22,17 +22,12 @@ pub fn hash_password(password: String) -> Result<String, StatusCode> {
     Ok(password_hash)
 }
 
-pub fn verify_password(original: &str, hashed_password: &str) -> Result<bool, StatusCode> {
+pub fn verify_password(original: &str, hashed_password: &str) -> bool {
     let argon2 = Argon2::default();
 
     let parsed = PasswordHash::new(hashed_password).unwrap();
-    match argon2.verify_password(original.as_bytes(), &parsed) {
-        Ok(_) => Ok(true),
-        Err(err) => {
-            tracing::error!("error verifying password: {}", err);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+
+    return argon2.verify_password(original.as_bytes(), &parsed).is_ok();
 }
 
 pub fn hash(data: &str) -> String {

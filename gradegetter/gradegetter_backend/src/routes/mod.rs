@@ -2,6 +2,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
 use std::{
     collections::HashSet,
@@ -67,11 +68,14 @@ pub struct AppState {
 }
 
 pub fn create_routes(pool: PgPool) -> Router {
-    let seen_users = Arc::new(RwLock::new(HashSet::new()));
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
 
+    let seen_users = Arc::new(RwLock::new(HashSet::new()));
     let app_state = AppState { pool, seen_users };
 
-    let routes_without_middleware = Router::new().route("/health", get(auth::health));
+    let routes_without_middleware = Router::new()
+        .route("/health", get(auth::health))
+        .route("/metrics", get(|| async move { metric_handle.render() }));
 
     let routes_with_middleware = Router::new()
         // Auth Routes
@@ -103,4 +107,5 @@ pub fn create_routes(pool: PgPool) -> Router {
         .merge(routes_without_middleware)
         .merge(SwaggerUi::new("/swegger-ui").url("/api-docs/openapi.json", DaApiDoc::openapi()))
         .with_state(app_state)
+        .layer(prometheus_layer)
 }
