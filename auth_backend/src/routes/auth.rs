@@ -334,7 +334,7 @@ pub async fn refresh_handler(
     })?;
 
     let sub = user.id.to_string();
-    let username = user.username;
+    let username = user.username.clone();
     let iat = OffsetDateTime::now_utc();
     let exp = iat + time::Duration::minutes(15);
 
@@ -355,6 +355,7 @@ pub async fn refresh_handler(
 
     headers.insert(SET_COOKIE, HeaderValue::from_str(&refresh_cookie).unwrap());
 
+    tracing::debug!("Refreshed ref_token for user: {}", user.username);
     Ok((headers, Json(LoginOutput { access_token })).into_response())
 }
 
@@ -521,6 +522,7 @@ pub struct ActiveSessions {
     #[serde(with = "jwt_numeric_date")]
     expires_at: OffsetDateTime,
     user_agent: String,
+    is_current: bool,
 }
 
 #[utoipa::path(
@@ -539,10 +541,11 @@ pub struct ActiveSessions {
 )]
 pub async fn list_active_sessions(
     State(pool): State<PgPool>,
+    TypedHeader(cookies): TypedHeader<Cookie>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let sessions = sqlx::query!(
-        "SELECT id, expires_at, user_agent FROM refresh_tokens
+        "SELECT id, expires_at, user_agent, token_hash FROM refresh_tokens
         WHERE user_id = $1
         AND replaced_by_token IS NULL",
         user.uuid
@@ -561,6 +564,9 @@ pub async fn list_active_sessions(
             session_id: session.id,
             expires_at: session.expires_at.assume_utc(),
             user_agent: session.user_agent.clone(),
+            is_current: {
+                hash(cookies.get("refresh_token").unwrap_or_default()) == session.token_hash
+            },
         });
     }
 

@@ -38,7 +38,7 @@ pub mod internal;
     tags(
         (name = "user_auth", description = "Authentication endpoints"),
         (name = "grades", description = "Grade Endpoints"),
-        (name = "", description = "Internal Endpoints")
+        (name = "internal", description = "Internal Endpoints")
     )
 )]
 pub struct DaApiDoc;

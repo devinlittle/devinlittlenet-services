@@ -13,9 +13,9 @@ use crate::{middleware::jwt::AuthenticatedUser, routes::AppState};
     ),
     responses(
         (status = 200, description = "Grades for the User", body = Value),
-        (status = 400, description = "No Grades"),
         (status = 401, description = "Credentials Incorrect"),
         (status = 403, description = "Role Mismatch"),
+        (status = 404, description = "No Grades Found"),
         (status = 500, description = "Interal Server Error")
     ),
     tag = "grades"
@@ -38,7 +38,7 @@ pub async fn grades_handler(
 
     let grades = match grades_row.map(|x| x.grades.unwrap()) {
         Some(grades) => grades,
-        None => return Err(axum::http::StatusCode::BAD_REQUEST),
+        None => return Err(axum::http::StatusCode::NOT_FOUND),
     };
 
     info!("Giving Grades to: {:?}", user.username);

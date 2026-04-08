@@ -22,7 +22,7 @@ pub struct SchoologyLogin {
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "Encrypts schoology info and inserts into database", body = String),
+        (status = 204, description = "Encrypts schoology info and inserts into database", body = String),
         (status = 401, description = "Credentials Incorrect"),
         (status = 500, description = "Internal Server Error")
     ),
@@ -32,7 +32,7 @@ pub async fn schoology_credentials_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<SchoologyLogin>,
-) -> Result<(), StatusCode> {
+) -> Result<StatusCode, StatusCode> {
     info!(
         "Encrypted Schoology Credentials added to user: {:?}",
         user.username
@@ -57,7 +57,7 @@ pub async fn schoology_credentials_handler(
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
@@ -67,7 +67,7 @@ pub async fn schoology_credentials_handler(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "Initilized User on GradeGetter", body = String),
+        (status = 204, description = "Initilized User on GradeGetter", body = String),
         (status = 401, description = "Credentials Incorrect"),
         (status = 500, description = "Interal Server Error")
     ),
@@ -75,7 +75,7 @@ pub async fn schoology_credentials_handler(
 )]
 pub async fn foward_to_gradegetter(
     Extension(user): Extension<AuthenticatedUser>,
-) -> Result<(), StatusCode> {
+) -> Result<StatusCode, StatusCode> {
     let client = reqwest::Client::new();
     let _ = client
         .post("http://gradegetter:3001/userinit")
@@ -86,7 +86,7 @@ pub async fn foward_to_gradegetter(
             error!("failed to initlize user... {}", err);
             axum::http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(

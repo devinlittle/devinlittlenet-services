@@ -14,7 +14,7 @@ use crate::routes::AppState;
         ("uuid", description = "pretty easy to understand what this means.")
     ),
     responses(
-        (status = 200, description = "removes uuid from HashSet defined in state, forces checks on next request", body = String),
+        (status = 200, description = "Removes uuid from HashSet defined in state, forces checks on next request", body = String),
         (status = 500, description = "Interal Server Error")
     ),
     tag = "internal"
