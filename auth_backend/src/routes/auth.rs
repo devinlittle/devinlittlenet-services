@@ -24,7 +24,7 @@ use uuid::Uuid;
 use crate::{
     middleware::jwt::{jwt_numeric_date, AuthenticatedUser, Claims},
     util::{
-        hash::{hash, validate},
+        hash::{hash, hash_password, verify_password},
         random::generate_random_string,
     },
 };
@@ -51,7 +51,7 @@ pub async fn register_handler(
     State(pool): State<PgPool>,
     Json(req): Json<RegisterInput>,
 ) -> Result<Json<String>, axum::http::StatusCode> {
-    let password_hash: String = hash(&req.password);
+    let password_hash: String = hash_password(req.password)?;
     sqlx::query("INSERT INTO users (username, password_hash) VALUES ($1, $2)")
         .bind(&req.username)
         .bind(&password_hash)
@@ -116,7 +116,7 @@ pub async fn login_handler(
         None => return Err(axum::http::StatusCode::UNAUTHORIZED), // User not found
     };
 
-    if validate(req.password.as_str(), &user.password_hash) {
+    if verify_password(req.password.as_str(), &user.password_hash)? {
         let sub = user.id.to_string();
         let username = req.username.to_string();
         let iat = OffsetDateTime::now_utc();

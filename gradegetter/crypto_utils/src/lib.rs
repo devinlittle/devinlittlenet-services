@@ -1,11 +1,11 @@
 use aes_gcm::{
-    Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
 };
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use dotenvy::dotenv;
 use once_cell::sync::Lazy;
-use rand::RngCore;
+use rand::{rng, Rng};
 use std::env;
 
 static ENCRYPTION_KEY: Lazy<Key<Aes256Gcm>> = Lazy::new(|| {
@@ -24,7 +24,8 @@ pub fn encrypt_string(plaintext: &str) -> String {
     let cipher = Aes256Gcm::new(&ENCRYPTION_KEY);
 
     let mut nonce_bytes = [0u8; 12];
-    rand::rng().fill_bytes(&mut nonce_bytes);
+    //rand::rng().fill_bytes(&mut nonce_bytes);
+    rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     let ciphertext = cipher
