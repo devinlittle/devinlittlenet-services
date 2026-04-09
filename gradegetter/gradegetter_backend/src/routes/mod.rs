@@ -2,7 +2,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use axum_prometheus::PrometheusMetricLayer;
+use axum_prometheus::PrometheusMetricLayerBuilder;
 use sqlx::PgPool;
 use std::{
     collections::HashSet,
@@ -68,7 +68,10 @@ pub struct AppState {
 }
 
 pub fn create_routes(pool: PgPool) -> Router {
-    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
+        .with_prefix("gradegetter_backend")
+        .with_default_metrics()
+        .build_pair();
 
     let seen_users = Arc::new(RwLock::new(HashSet::new()));
     let app_state = AppState { pool, seen_users };

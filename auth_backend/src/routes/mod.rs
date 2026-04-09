@@ -2,7 +2,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use axum_prometheus::PrometheusMetricLayer;
+use axum_prometheus::PrometheusMetricLayerBuilder;
 use sqlx::PgPool;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -87,7 +87,10 @@ impl utoipa::Modify for InternalAuth {
 }
 
 pub fn create_routes(pool: PgPool) -> Router {
-    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
+        .with_prefix("auth_backend")
+        .with_default_metrics()
+        .build_pair();
 
     let routes_without_middleware = Router::new()
         .route("/register", post(auth::register_handler))
