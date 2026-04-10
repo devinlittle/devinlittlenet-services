@@ -28,7 +28,7 @@ pub struct SchoologyLogin {
     ),
     tag = "user_auth"
 )]
-pub async fn schoology_credentials_handler(
+pub async fn add_schoology_credentials_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<SchoologyLogin>,
@@ -56,6 +56,42 @@ pub async fn schoology_credentials_handler(
         );
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/auth/schoology/credentials",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 204, description = "Encrypts schoology info and inserts into database", body = String),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 500, description = "Internal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn delete_schoology_credentials_handler(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Result<StatusCode, StatusCode> {
+    info!(
+        "Encrypted Schoology Credentials removed from user: {:?}",
+        user.username
+    );
+
+    sqlx::query!("DELETE FROM schoology_auth WHERE id = $1", user.uuid)
+        .execute(&state.pool)
+        .await
+        .map_err(|err| {
+            error!(
+                "Failed to delete Schoology credentials for user {}: {}",
+                user.uuid, err
+            );
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }

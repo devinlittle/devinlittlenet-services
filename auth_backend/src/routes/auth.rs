@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use anyhow::Result;
 use axum::{
     extract::{Path, State},
@@ -307,7 +305,7 @@ pub async fn refresh_handler(
     let refresh_token = generate_random_string();
 
     let refresh_token_query = sqlx::query!(
-        "UPDATE refresh_tokens 
+        "UPDATE refresh_tokens
          SET revoked_at = NOW(), replaced_by_token = $2
          WHERE token_hash = $1
          AND revoked_at IS NULL

@@ -1,5 +1,5 @@
 use axum::{
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
     Router,
 };
 use axum_prometheus::PrometheusMetricLayerBuilder;
@@ -10,6 +10,7 @@ use utoipa::{
 };
 use utoipa_swagger_ui::SwaggerUi;
 
+pub mod admin;
 pub mod auth;
 pub mod internal;
 
@@ -26,6 +27,11 @@ pub mod internal;
         crate::routes::auth::list_active_sessions,
         crate::routes::auth::revoke_specific_session,
         crate::routes::auth::revoke_all_sessions,
+        // Admin Paths
+        crate::routes::admin::list_users,
+        crate::routes::admin::change_role,
+        crate::routes::admin::revoke_all_from_id,
+        crate::routes::admin::evict_from_hashset,
         // Internal Paths
         crate::routes::internal::get_user_roles
     ),
@@ -108,6 +114,11 @@ pub fn create_routes(pool: PgPool) -> Router {
             delete(auth::revoke_specific_session),
         )
         .route("/sessions/revoke", delete(auth::revoke_all_sessions))
+        //Admin Routes
+        .route("/admin/users", get(admin::list_users))
+        .route("/admin/users/{id}/role", patch(admin::change_role))
+        .route("/admin/users/{id}/evict", post(admin::evict_from_hashset))
+        .route("/admin/revoke_all/{id}", delete(admin::revoke_all_from_id))
         .layer(axum::middleware::from_fn(crate::middleware::jwt::jwt_auth));
 
     let internal_routes = Router::new()

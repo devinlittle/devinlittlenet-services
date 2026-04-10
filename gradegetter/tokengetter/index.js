@@ -27,7 +27,7 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
     await page.setUserAgent('Mozilla/6.0 (X11; Linux x86_64) AppleWebKit/538.40 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36');
 
     const recorder = new PuppeteerScreenRecorder(page);
-    await recorder.start('/app/recordings/recording.mp4');
+    await recorder.start("/app/recordings/recording.mp4");
 
     // login
     await page.goto('https://essexnorthshore.schoology.com/');
@@ -70,5 +70,6 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
+    await recorder.stop();
   }
 })();

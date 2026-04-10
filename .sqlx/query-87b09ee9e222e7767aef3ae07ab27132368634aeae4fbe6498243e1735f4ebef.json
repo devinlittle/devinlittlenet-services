@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refresh_tokens\n         SET revoked_at = NOW(), replaced_by_token = $2\n         WHERE token_hash = $1\n         AND revoked_at IS NULL\n         AND expires_at > NOW()\n         RETURNING user_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "87b09ee9e222e7767aef3ae07ab27132368634aeae4fbe6498243e1735f4ebef"
+}

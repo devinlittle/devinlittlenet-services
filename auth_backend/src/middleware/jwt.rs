@@ -1,7 +1,7 @@
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
     TypedHeader,
-    headers::{Authorization, authorization::Bearer},
 };
 use jsonwebtoken::{DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,7 @@ use utoipa::ToSchema;
 pub struct AuthenticatedUser {
     pub username: String,
     pub uuid: uuid::Uuid,
+    pub role: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, ToSchema)]
@@ -59,10 +60,18 @@ pub async fn jwt_auth(
 
     let uuid = uuid::Uuid::parse_str(&decoded_jwt.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
     let username = decoded_jwt.username;
+    let role = decoded_jwt
+        .roles
+        .get("global")
+        .and_then(|v| v.as_str())
+        .unwrap_or("user")
+        .to_string();
 
-    request
-        .extensions_mut()
-        .insert(AuthenticatedUser { username, uuid });
+    request.extensions_mut().insert(AuthenticatedUser {
+        username,
+        uuid,
+        role,
+    });
 
     Ok(next.run(request).await)
 }

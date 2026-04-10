@@ -62,9 +62,13 @@ COPY ./gradegetter/gradegetter/ ./gradegetter/
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/lib/chromium/chromium
 ENV RUST_LOG=info
 
-RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /app && \
+    mkdir -p /app/recordings && \
+    chown appuser:appuser /app/recordings
+
 USER appuser
 WORKDIR /app/gradegetter
+
 
 EXPOSE 3001
 CMD ["./gradegetter"]

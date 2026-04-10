@@ -21,7 +21,8 @@ pub mod internal;
       paths(
         // Auth paths
         crate::routes::auth::foward_to_gradegetter,
-        crate::routes::auth::schoology_credentials_handler,
+        crate::routes::auth::add_schoology_credentials_handler,
+        crate::routes::auth::delete_schoology_credentials_handler,
         crate::routes::auth::health,
         // Grade path
         crate::routes::grades::grades_handler,
@@ -85,7 +86,11 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/auth/forward", get(auth::foward_to_gradegetter))
         .route(
             "/auth/schoology/credentials",
-            post(auth::schoology_credentials_handler),
+            post(auth::add_schoology_credentials_handler),
+        )
+        .route(
+            "/auth/schoology/credentials",
+            delete(auth::delete_schoology_credentials_handler),
         )
         // Grade Route
         .route("/grades", get(grades::grades_handler))

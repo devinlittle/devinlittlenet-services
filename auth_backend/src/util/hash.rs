@@ -25,7 +25,11 @@ pub fn hash_password(password: String) -> Result<String, StatusCode> {
 pub fn verify_password(original: &str, hashed_password: &str) -> bool {
     let argon2 = Argon2::default();
 
-    let parsed = PasswordHash::new(hashed_password).unwrap();
+    let parsed = PasswordHash::new(hashed_password)
+        .map_err(|err| {
+            tracing::error!("error verifying password: {}", err);
+        })
+        .unwrap();
 
     return argon2.verify_password(original.as_bytes(), &parsed).is_ok();
 }

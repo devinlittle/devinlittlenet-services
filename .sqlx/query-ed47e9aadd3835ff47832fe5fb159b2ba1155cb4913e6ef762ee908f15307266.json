@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users\n     SET roles = jsonb_set(roles, $1, $2::jsonb)\n     WHERE id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Jsonb",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed47e9aadd3835ff47832fe5fb159b2ba1155cb4913e6ef762ee908f15307266"
+}
