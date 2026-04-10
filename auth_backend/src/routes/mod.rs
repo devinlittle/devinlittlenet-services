@@ -118,6 +118,7 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}/role", patch(admin::change_role))
         .route("/admin/users/{id}/evict", post(admin::evict_from_hashset))
+        .route("/admin/users/{id}/delete", delete(admin::delete_by_id))
         .route("/admin/revoke_all/{id}", delete(admin::revoke_all_from_id))
         .layer(axum::middleware::from_fn(crate::middleware::jwt::jwt_auth));
 

@@ -4,7 +4,6 @@ use axum::{
     Extension, Json,
 };
 use hyper::StatusCode;
-use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
@@ -210,7 +209,7 @@ pub async fn evict_from_hashset(
     let client = reqwest::Client::new();
 
     let _ = client
-        .delete(format!(
+        .get(format!(
             "http://gradegetter_backend:3002/internal/invalidate/{}",
             target_id
         ))
@@ -226,4 +225,65 @@ pub async fn evict_from_hashset(
 
     tracing::info!("deleted user: {}", user.username);
     Ok((axum::http::StatusCode::OK).into_response())
+}
+
+#[utoipa::path(
+    delete,
+    path = "/admin/users/{id}/delete",
+    params(
+        ("id", description = "the id of the user to delete")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 401, description = "token error i think"),
+        (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
+        (status = 404, description = "user not found"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "admin"
+)]
+pub async fn delete_by_id(
+    State(pool): State<PgPool>,
+    Path(target_id): Path<Uuid>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Result<impl IntoResponse, StatusCode> {
+    if user.role != "devin" && user.role != "owen" {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let internal_api_key =
+        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+
+    match sqlx::query!("DELETE FROM users WHERE id = $1", target_id)
+        .execute(&pool)
+        .await
+    {
+        Ok(result) if result.rows_affected() > 0 => {
+            let client = reqwest::Client::new();
+
+            let _ = client
+                .delete(format!(
+                    "http://gradegetter_backend:3002/internal/delete/{}",
+                    user.uuid
+                ))
+                .header(
+                    "Authorization",
+                    format!("Basic {}", internal_api_key.as_str()),
+                )
+                .send()
+                .await
+                .map_err(|err| tracing::error!("failed to delete user from gradegetter: {}", err));
+
+            tracing::info!("deleted user: {}", user.username);
+            Ok((axum::http::StatusCode::OK).into_response())
+        }
+        Ok(_) => Err(StatusCode::NOT_FOUND),
+        Err(err) => {
+            tracing::error!("database error: {:?}", err);
+            Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
