@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{
-    extract::{ws::Message, State, WebSocketUpgrade},
+    extract::{ws::Message, Path, State, WebSocketUpgrade},
     http::StatusCode,
     response::IntoResponse,
     Extension, Json,
@@ -9,6 +9,7 @@ use serde::Deserialize;
 use tokio::sync::watch::{self};
 use tracing::{error, info};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{middleware::jwt::AuthenticatedUser, routes::AppState};
 
@@ -147,7 +148,10 @@ pub async fn foward_to_gradegetter(
 
 #[utoipa::path(
     get,
-    path = "/auth/forward_ws",
+    path = "/auth/forward_ws/{id}",
+    params(
+        ("uuid", description = "pretty easy to understand what this means.")
+    ),
     security(
         ("bearer_auth" = [])
     ),
@@ -161,16 +165,15 @@ pub async fn foward_to_gradegetter(
 pub async fn forward_status_for_client(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    Extension(user): Extension<AuthenticatedUser>,
+    Path(uuid): Path<Uuid>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|mut socket| async move {
-        let Some(tx) = state.channels.get(&user.uuid.to_string()) else {
+    ws.on_upgrade(move |mut socket| async move {
+        let Some(tx) = state.channels.get(&uuid.to_string()) else {
             return;
         };
 
         let mut rx = tx.subscribe();
         drop(tx);
-        drop(user);
 
         while rx.changed().await.is_ok() {
             let msg = rx.borrow_and_update().clone();

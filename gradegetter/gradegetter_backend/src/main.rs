@@ -26,6 +26,8 @@ async fn main() {
     let origins = [
         "http://127.0.0.1:5173".parse().unwrap(),
         "https://127.0.0.1:5173".parse().unwrap(),
+        "http://10.10.10.10:5173".parse().unwrap(),
+        "https://10.10.10.10:5173".parse().unwrap(),
         "https://localhost:5173".parse().unwrap(),
         "https://devinlittle.net".parse().unwrap(),
         "https://api.devinlittle.net".parse().unwrap(),
@@ -36,10 +38,20 @@ async fn main() {
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
+            axum::http::Method::PATCH,
             axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+        .allow_headers([
+            AUTHORIZATION,
+            CONTENT_TYPE,
+            axum::http::header::UPGRADE,
+            axum::http::header::CONNECTION,
+            axum::http::header::HeaderName::from_static("sec-websocket-key"),
+            axum::http::header::HeaderName::from_static("sec-websocket-version"),
+            axum::http::header::HeaderName::from_static("sec-websocket-extensions"),
+            axum::http::header::HeaderName::from_static("sec-websocket-protocol"),
+        ])
         .allow_credentials(true);
 
     let database_string = dotenvy::var("DATABASE_URL").expect("DATABASE_URL env_var not found");

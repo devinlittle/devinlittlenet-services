@@ -90,19 +90,20 @@ pub fn create_routes(pool: PgPool) -> Router {
 
     let routes_without_middleware = Router::new()
         .route("/health", get(auth::health))
-        .route("/metrics", get(|| async move { metric_handle.render() }));
+        .route("/metrics", get(|| async move { metric_handle.render() }))
+        // Fowrard route here bc u cant add authorization headers to websockets in browser :(
+        .route(
+            "/auth/forward_ws/{uuid}",
+            get(auth::forward_status_for_client),
+        );
 
     let routes_with_middleware = Router::new()
         // Auth Routes
         .route("/auth/forward", get(auth::foward_to_gradegetter))
-        .route("/auth/forward_ws", get(auth::forward_status_for_client))
         .route(
             "/auth/schoology/credentials",
-            post(auth::add_schoology_credentials_handler),
-        )
-        .route(
-            "/auth/schoology/credentials",
-            delete(auth::delete_schoology_credentials_handler),
+            post(auth::add_schoology_credentials_handler)
+                .delete(auth::delete_schoology_credentials_handler),
         )
         // Grade Route
         .route("/grades", get(grades::grades_handler))
