@@ -1,6 +1,12 @@
 use anyhow::Result;
-use axum::{extract::State, http::StatusCode, Extension, Json};
+use axum::{
+    extract::{ws::Message, State, WebSocketUpgrade},
+    http::StatusCode,
+    response::IntoResponse,
+    Extension, Json,
+};
 use serde::Deserialize;
+use tokio::sync::watch::{self};
 use tracing::{error, info};
 use utoipa::ToSchema;
 
@@ -110,19 +116,69 @@ pub async fn delete_schoology_credentials_handler(
     tag = "user_auth"
 )]
 pub async fn foward_to_gradegetter(
+    State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<StatusCode, StatusCode> {
-    let client = reqwest::Client::new();
-    let _ = client
-        .post("http://gradegetter:3001/userinit")
-        .body(user.uuid.to_string())
-        .send()
-        .await
-        .map_err(|err| {
-            error!("failed to initlize user... {}", err);
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let (tx, rx) = watch::channel(user.uuid.to_string());
+    state.channels.insert(user.uuid.to_string(), tx);
+
+    let uuid = user.uuid.to_string();
+    let channels = state.channels.clone();
+
+    tokio::spawn(async move {
+        let _rx = rx; // keeps receiver alive for the entire job
+        let client = reqwest::Client::new();
+        let result = client
+            .post("http://gradegetter:3001/userinit")
+            .body(uuid.clone())
+            .send()
+            .await;
+
+        match result {
+            Ok(res) => tracing::info!("gradegetter responded: {}", res.status()),
+            Err(e) => tracing::error!("failed to initialize user: {e}"),
+        }
+
+        channels.remove(&uuid)
+    });
+
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    get,
+    path = "/auth/forward_ws",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 204, description = "giving status boy", body = String),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn forward_status_for_client(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|mut socket| async move {
+        let Some(tx) = state.channels.get(&user.uuid.to_string()) else {
+            return;
+        };
+
+        let mut rx = tx.subscribe();
+        drop(tx);
+        drop(user);
+
+        while rx.changed().await.is_ok() {
+            let msg = rx.borrow_and_update().clone();
+            if socket.send(Message::Text(msg.into())).await.is_err() {
+                break;
+            }
+        }
+    })
 }
 
 #[utoipa::path(

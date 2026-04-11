@@ -1,8 +1,10 @@
 use axum::{
-    extract::{Path, State},
+    extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
 };
 use hyper::StatusCode;
+use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::routes::AppState;
@@ -69,4 +71,44 @@ pub async fn delete_handler(
             axum::http::StatusCode::INTERNAL_SERVER_ERROR
         }
     }
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ForwardMessage {
+    id: Uuid,
+    status: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/internal/forward_ws",
+    request_body = ForwardMessage,
+    responses(
+        (status = 200, description = "adding information from gradegetter", body = String),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "internal"
+)]
+pub async fn forward_status_ws(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|mut socket| async move {
+        tracing::debug!("internal ws connected");
+        while let Some(Ok(Message::Text(msg))) = socket.recv().await {
+            tracing::debug!("internal ws received: {}", msg);
+            let payload: ForwardMessage = serde_json::from_str(msg.as_str()).unwrap(); //HACK: 1 unwrap here
+            if let Some(tx) = state.channels.get(&payload.id.to_string()) {
+                tracing::debug!("found channel for {}, sending", payload.id);
+                tx.send(payload.status)
+                    .map_err(|err| {
+                        tracing::error!("{}", err);
+                    })
+                    .unwrap(); //HACK: 1 unwrap here
+            } else {
+                tracing::warn!("no channel found for id: {}", payload.id);
+            }
+        }
+        tracing::debug!("internal ws disconnected");
+    })
 }

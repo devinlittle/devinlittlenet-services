@@ -3,11 +3,13 @@ use axum::{
     Router,
 };
 use axum_prometheus::PrometheusMetricLayerBuilder;
+use dashmap::DashMap;
 use sqlx::PgPool;
 use std::{
     collections::HashSet,
     sync::{Arc, RwLock},
 };
+use tokio::sync::watch;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
@@ -21,6 +23,7 @@ pub mod internal;
       paths(
         // Auth paths
         crate::routes::auth::foward_to_gradegetter,
+        crate::routes::auth::forward_status_for_client,
         crate::routes::auth::add_schoology_credentials_handler,
         crate::routes::auth::delete_schoology_credentials_handler,
         crate::routes::auth::health,
@@ -29,6 +32,7 @@ pub mod internal;
         // Internal Paths
         crate::routes::internal::invalidate_user,
         crate::routes::internal::delete_handler,
+        crate::routes::internal::forward_status_ws,
     ),
     components(
         schemas(
@@ -66,6 +70,7 @@ impl utoipa::Modify for JwtBearer {
 pub struct AppState {
     pub pool: PgPool,
     pub seen_users: Arc<RwLock<HashSet<Uuid>>>,
+    pub channels: Arc<DashMap<String, watch::Sender<String>>>,
 }
 
 pub fn create_routes(pool: PgPool) -> Router {
@@ -75,7 +80,13 @@ pub fn create_routes(pool: PgPool) -> Router {
         .build_pair();
 
     let seen_users = Arc::new(RwLock::new(HashSet::new()));
-    let app_state = AppState { pool, seen_users };
+    let channels = Arc::new(DashMap::new());
+
+    let app_state = AppState {
+        pool,
+        seen_users,
+        channels,
+    };
 
     let routes_without_middleware = Router::new()
         .route("/health", get(auth::health))
@@ -84,6 +95,7 @@ pub fn create_routes(pool: PgPool) -> Router {
     let routes_with_middleware = Router::new()
         // Auth Routes
         .route("/auth/forward", get(auth::foward_to_gradegetter))
+        .route("/auth/forward_ws", get(auth::forward_status_for_client))
         .route(
             "/auth/schoology/credentials",
             post(auth::add_schoology_credentials_handler),
@@ -105,6 +117,7 @@ pub fn create_routes(pool: PgPool) -> Router {
             get(internal::invalidate_user),
         )
         .route("/internal/delete/{uuid}", delete(internal::delete_handler))
+        .route("/internal/forward_ws", get(internal::forward_status_ws))
         .layer(axum::middleware::from_fn(
             crate::middleware::internal::basic_auth,
         ));

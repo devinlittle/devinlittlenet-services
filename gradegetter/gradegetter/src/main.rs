@@ -4,16 +4,20 @@ use axum::{
     Router,
 };
 use crypto_utils::{decrypt_string, encrypt_string};
+use futures_util::{SinkExt, StreamExt};
 use regex::Regex;
+use serde::Serialize;
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{
     collections::HashMap,
+    process::Stdio,
     str,
     sync::{Arc, LazyLock},
     time::Duration,
 };
 use tokio::{
+    io::{AsyncBufReadExt, AsyncReadExt, BufReader},
     net::TcpListener,
     process::Command,
     signal::{
@@ -21,6 +25,8 @@ use tokio::{
         unix::{signal, SignalKind},
     },
 };
+use tokio_tungstenite::{connect_async, tungstenite::client::IntoClientRequest};
+use uuid::Uuid;
 
 use tracing::{debug, error, info, trace};
 use tracing_subscriber::EnvFilter;
@@ -94,7 +100,9 @@ async fn main() -> Result<(), anyhow::Error> {
                         continue;
                     }
 
-                    let token = match get_token(dec_email.as_str(), dec_password.as_str()).await {
+                    let token = match get_token(dec_email.as_str(), dec_password.as_str(), None)
+                        .await
+                    {
                         Ok(token) => token,
                         Err(err) => {
                             tracing::error!("get_token failure with user: {}, error: {}", id, err);
@@ -291,7 +299,13 @@ async fn user_token_initalize(
 
     let dec_password = decrypt_string(password.as_str());
     let dec_email = decrypt_string(email.as_str());
-    let token = match get_token(dec_email.unwrap().as_str(), dec_password.unwrap().as_str()).await {
+    let token = match get_token(
+        dec_email.unwrap().as_str(),
+        dec_password.unwrap().as_str(),
+        Some(id),
+    )
+    .await
+    {
         Ok(token) => token,
         Err(err) => {
             tracing::error!("get_token failure with user: {}, error: {}", id, err);
@@ -333,24 +347,84 @@ async fn user_token_initalize(
     Ok("Hi".to_string())
 }
 
-async fn get_token(email: &str, password: &str) -> Result<String, anyhow::Error> {
+#[derive(Serialize, Debug)]
+pub struct ForwardMessage {
+    id: Uuid,
+    status: String,
+}
+
+async fn get_token(
+    email: &str,
+    password: &str,
+    uuid: Option<Uuid>,
+) -> Result<String, anyhow::Error> {
     let executable =
         dotenvy::var("PUPPETEER_EXECUTABLE_PATH").expect("PUPPETEER_EXECUTABLE_PATH not found");
-    let output = Command::new("node")
+    let mut child = Command::new("node")
         .env("PUPPETEER_EXECUTABLE_PATH", executable)
         .arg("../tokengetter/") // ASSuming this is the path; adjust if needed...ass
         .arg(email)
         .arg(password)
-        .output()
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("failed to execute tokengetter")?;
+
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("failed to capture stderr"))?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("failed to capture stderr"))?;
+    let mut lines = BufReader::new(stderr).lines();
+
+    if let Some(uuid) = uuid {
+        let mut request =
+            "ws://gradegetter_backend:3002/internal/forward_ws".into_client_request()?;
+
+        let internal_api = dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY var missing");
+
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Basic {}", internal_api).parse()?);
+
+        let (ws_stream, _) = connect_async(request).await?; //HACK: unwrap
+        let (mut write, _read) = ws_stream.split();
+
+        tokio::spawn(async move {
+            /*HACK: unwarappy */
+            while let Some(line) = lines.next_line().await.unwrap() {
+                let msg = ForwardMessage {
+                    id: uuid,
+                    status: line,
+                };
+
+                tracing::debug!("{:?}", msg);
+
+                let json = serde_json::to_string(&msg).unwrap(); //HACK: unwrap
+                write
+                    .send(tokio_tungstenite::tungstenite::Message::Text(json.into()))
+                    .await
+                    .unwrap(); //HACK: unwrap
+            }
+        });
+    }
+
+    let mut token = String::new();
+
+    child
+        .wait()
         .await
         .context("failed to execute tokengetter")?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("the tokengetter script failed: {}", stderr);
-    }
+    stdout
+        .read_to_string(&mut token)
+        .await
+        .context("failed to insert stdout contents into token string")?;
 
-    let token = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let token = token.trim().to_string();
 
     if token.is_empty() {
         anyhow::bail!("tokengetter returned an empty token");

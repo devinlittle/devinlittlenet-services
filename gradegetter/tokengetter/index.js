@@ -28,16 +28,20 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
 
     const recorder = new PuppeteerScreenRecorder(page);
     await recorder.start("/app/recordings/recording.mp4");
+    console.error("Started,1"); // Started
 
     // login
     await page.goto('https://essexnorthshore.schoology.com/');
+    console.error("Navigated to Schoology login,2"); // Went to schoology page
 
     await page.waitForSelector('input[type="email"]', {
       visible: true,
       timeout: 30000
     });
     await page.type('input[type="email"]', `${args[2]}`); // <-- config value
+    console.error("Typed in Email,3"); // Typed email
     await page.click('#identifierNext');
+    console.error("Entered Email,4"); // entered email
 
 
     await page.waitForSelector('input[type="password"]', {
@@ -45,7 +49,9 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
       timeout: 30000
     });
     await page.type('input[type="password"]', `${args[3]}`); // <-- config value
+    console.error("Typed in Password,5"); // typed password
     await page.click('#passwordNext');
+    console.error("Enter Password,6"); // entered password
     await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 30000 });
 
     // Cookie time
@@ -62,6 +68,7 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
     }
 
     let cookie = `${sessCookie.name}=${sessCookie.value}`;
+    console.error("Finished,7"); // grabbed cookie
     console.log(cookie);
 
     await browser.close();
@@ -69,7 +76,7 @@ const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
-    process.exit(1);
     await recorder.stop();
+    process.exit(1);
   }
 })();

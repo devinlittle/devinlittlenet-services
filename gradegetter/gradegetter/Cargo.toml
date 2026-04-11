@@ -20,7 +20,8 @@ uuid.workspace = true
 dotenvy.workspace = true
 crypto_utils.workspace = true
 anyhow.workspace = true
-
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
 axum.workspace = true 
 tracing.workspace = true
 tracing-subscriber.workspace = true
