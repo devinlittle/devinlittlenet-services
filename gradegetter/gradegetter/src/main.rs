@@ -7,7 +7,6 @@ use crypto_utils::{decrypt_string, encrypt_string};
 use futures_util::{SinkExt, StreamExt};
 use regex::Regex;
 use serde::Serialize;
-use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{
     collections::HashMap,
@@ -440,7 +439,7 @@ async fn get_token(
     Ok(encrypt_string(&token))
 }
 
-async fn fetch_grades(token: String) -> Result<Value, anyhow::Error> {
+async fn fetch_grades(token: String) -> Result<String, anyhow::Error> {
     let forms = select_grade_period(token.clone())
         .await
         .context("select_grade_period failed")?;
@@ -456,7 +455,9 @@ async fn fetch_grades(token: String) -> Result<Value, anyhow::Error> {
     let grades: HashMap<String, Vec<Option<f32>>> =
         parse_grades_html(html).context("parse_grades_html failed to parse through html")?;
 
-    Ok(serde_json::to_value(grades)?)
+    let grades = serde_json::to_value(grades)?.to_string();
+
+    Ok(encrypt_string(grades.as_str()))
 }
 
 static FORM_ID_RE: LazyLock<Regex> =

@@ -1,4 +1,5 @@
 use axum::{extract::State, Extension, Json};
+use crypto_utils::decrypt_string;
 use hyper::StatusCode;
 use serde_json::Value;
 use tracing::info;
@@ -23,7 +24,7 @@ use crate::{middleware::jwt::AuthenticatedUser, routes::AppState};
 pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
-) -> Result<Json<Value>, axum::http::StatusCode> {
+) -> Result<Json<Value>, StatusCode> {
     if user.role != "devin" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
     }
@@ -36,10 +37,20 @@ pub async fn grades_handler(
             axum::http::StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let grades = match grades_row.map(|x| x.grades.unwrap()) {
-        Some(grades) => grades,
-        None => return Err(axum::http::StatusCode::NOT_FOUND),
+    let encrypted_grades = match grades_row {
+        Some(encrypted_grades) => encrypted_grades,
+        None => return Err(StatusCode::NOT_FOUND),
     };
+
+    let grades = decrypt_string(encrypted_grades.grades.as_str()).map_err(|err| {
+        tracing::error!("failed to decrypt grades: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let grades: serde_json::Value = serde_json::from_str(&grades).map_err(|err| {
+        tracing::error!("failed to parse grades JSON: {}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     info!("Giving Grades to: {:?}", user.username);
     Ok(Json(grades))
