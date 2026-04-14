@@ -62,3 +62,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secretName }}
                   key: ENCRYPTION_KEY
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: INTERNAL_API_KEY

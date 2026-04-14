@@ -20,14 +20,14 @@ spec:
       http:
         paths:
           - path: /gradegetter/
-            pathType: Prefix
+            pathType: Exact
             backend:
               service:
                 name: gradegetter_backend
                 port:
                   number: 3002
           - path: /auth/
-            pathType: Prefix
+            pathType: Exact
             backend:
               service:
                 name: auth_backend

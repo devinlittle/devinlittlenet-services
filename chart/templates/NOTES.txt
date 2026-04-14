@@ -1,6 +1,6 @@
-GradeGetter deployed!!!
+DevinLitteNet Services deployed!!!
 
-Backend is available at: http://{{ .Values.ingress.host }}
+Available at: http://{{ .Values.ingress.host }}
 
 Before deploying make sure you've created your secrets:
 
@@ -8,3 +8,12 @@ Before deploying make sure you've created your secrets:
     --from-literal=HASH_SECRET="..." \
     --from-literal=JWT_SECRET="..." \
     --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)"
+    --from-literal=INTERNAL_API_KEY="$(base64 -i - <<< internal:password)"
+
+
+kubectl create secret docker-registry {{ .Values.imagePullSecret }} \
+  --docker-server=10.10.10.245:5000 \
+  --docker-username=<user> \
+  --docker-password=<password> \
+  --namespace=<your-namespace>
+
