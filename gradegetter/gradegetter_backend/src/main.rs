@@ -1,5 +1,5 @@
 use axum::Router;
-use hyper::header::{AUTHORIZATION, CONTENT_TYPE};
+use hyper::header::{ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
 use tokio::signal::{
@@ -45,6 +45,7 @@ async fn main() {
         .allow_headers([
             AUTHORIZATION,
             CONTENT_TYPE,
+            ACCESS_CONTROL_ALLOW_ORIGIN,
             axum::http::header::UPGRADE,
             axum::http::header::CONNECTION,
             axum::http::header::HeaderName::from_static("sec-websocket-key"),

@@ -1,5 +1,5 @@
 use axum::Router;
-use hyper::header::{AUTHORIZATION, CONTENT_TYPE};
+use hyper::header::{ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
 use tokio::signal::{
@@ -42,9 +42,8 @@ async fn main() {
             axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCESS_CONTROL_ALLOW_ORIGIN])
         .allow_credentials(true);
-    //        .allow_origin(Any)
 
     let database_string = dotenvy::var("DATABASE_URL").expect("DATABASE_URL env_var not found");
 
