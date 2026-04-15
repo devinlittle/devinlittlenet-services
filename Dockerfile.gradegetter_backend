@@ -18,11 +18,12 @@ RUN --mount=type=cache,target=/app/target/ \
 cargo build --locked --release --bin gradegetter_backend && \
 cp ./target/release/$APP_NAME /bin/server
 
-RUN --mount=type=cache,target=/app/target/ \
-    --mount=type=cache,target=/usr/local/cargo/git/db \
-    --mount=type=cache,target=/usr/local/cargo/registry/ \
-cargo install sqlx-cli --no-default-features --features postgres && \
-cp /usr/local/cargo/bin/sqlx /bin/sqlx
+################################################################################
+FROM rust:${RUST_VERSION}-alpine AS sqlx_build
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo install sqlx-cli --no-default-features --features postgres && \
+    cp /usr/local/cargo/bin/sqlx /bin/sqlx
 
 ################################################################################
 FROM alpine:${ALPINE_VERSION} AS final
@@ -38,7 +39,7 @@ RUN adduser \
     appuser
 
 COPY --from=build /bin/server /bin/
-COPY --from=build /bin/sqlx /bin/
+COPY --from=sqlx_build /usr/local/cargo/bin/sqlx /bin/sqlx
 COPY --chown=appuser ./gradegetter/gradegetter_backend/migrations /migrations
 
 USER appuser
