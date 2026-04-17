@@ -1,0 +1,46 @@
+[package]
+name = "notification_backend"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+tokio.workspace = true
+axum = { workspace = true, features = ["ws"] }
+axum-extra = {workspace = true, features = ["typed-header"]}
+axum-server = {workspace = true}
+hyper.workspace = true
+hyper-tls.workspace = true
+tower-http.workspace = true
+tower.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+rustls = {workspace = true, features = ["ring"]}
+ring.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"]  }
+anyhow.workspace = true
+
+sha2.workspace = true
+sqlx = { workspace = true, features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "migrate",
+  "json",
+  "time",
+  "uuid"]}
+uuid.workspace = true
+time.workspace = true
+jsonwebtoken.workspace = true
+crypto_utils.workspace = true
+base64.workspace = true
+dashmap.workspace = true
+
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+dotenvy.workspace = true
+constant_time_eq.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }

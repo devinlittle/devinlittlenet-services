@@ -1016,40 +1016,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gloss_backend"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "axum",
- "axum-extra",
- "axum-server",
- "base64",
- "constant_time_eq",
- "crypto_utils",
- "dotenvy",
- "hyper",
- "hyper-tls",
- "jsonwebtoken",
- "openssl",
- "reqwest",
- "ring",
- "rustls",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "time",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "utoipa",
- "utoipa-swagger-ui",
- "uuid",
-]
-
-[[package]]
 name = "gradegetter"
 version = "0.0.1"
 dependencies = [
@@ -1766,6 +1732,41 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "notification_backend"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "axum-server",
+ "base64",
+ "constant_time_eq",
+ "crypto_utils",
+ "dashmap",
+ "dotenvy",
+ "hyper",
+ "hyper-tls",
+ "jsonwebtoken",
+ "openssl",
+ "reqwest",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "uuid",
+]
 
 [[package]]
 name = "nu-ansi-term"
