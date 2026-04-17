@@ -4,6 +4,7 @@ use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
 };
+use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::broadcast};
 use uuid::Uuid;
@@ -137,7 +138,16 @@ pub async fn notify(
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+
 struct SendNotification {
     recipient: String,
     content: String,
+}
+
+//#[utoipa::path(get, path = "/internal/global_message")]
+pub async fn global_message(State(state): State<AppState>, message: String) -> StatusCode {
+    match state.global_channel.send(message) {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }

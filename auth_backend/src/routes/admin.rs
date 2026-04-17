@@ -287,3 +287,60 @@ pub async fn delete_by_id(
         }
     }
 }
+
+#[utoipa::path(
+    post,
+    path = "/admin/global_message",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 401, description = "token error i think"),
+        (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
+        (status = 404, description = "user not found"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    request_body = Message,
+    tag = "admin"
+)]
+pub async fn global_message(
+    Extension(user): Extension<AuthenticatedUser>,
+    Json(req): Json<Message>,
+) -> Result<impl IntoResponse, StatusCode> {
+    if user.role != "devin" && user.role != "owen" {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let internal_api_key =
+        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+
+    let client = reqwest::Client::new();
+
+    let message = serde_json::to_value(Message {
+        r#type: "global".to_string(),
+        title: req.title,
+        content: req.content,
+    })
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let _ = client
+        .post("http://notification_backend:3003/internal/global_message")
+        .header(
+            "Authorization",
+            format!("Basic {}", internal_api_key.as_str()),
+        )
+        .body(message.to_string())
+        .send()
+        .await
+        .map_err(|err| tracing::error!("failed to send message: {}", err));
+
+    Ok((axum::http::StatusCode::OK).into_response())
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct Message {
+    r#type: String,
+    title: String,
+    content: String,
+}

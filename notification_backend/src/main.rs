@@ -9,6 +9,7 @@ use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+mod middleware;
 mod routes;
 mod utils;
 

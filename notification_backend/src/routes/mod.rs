@@ -4,12 +4,8 @@ use axum::{
 };
 use dashmap::DashMap;
 use hyper::StatusCode;
-use sqlx::PgPool;
-use std::{
-    collections::HashSet,
-    sync::{Arc, RwLock},
-};
-use tokio::sync::{broadcast, watch};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
@@ -67,11 +63,18 @@ pub fn create_routes() -> Router {
         .route("/health", get(health))
         .route("/ws/{uuid}", get(noties::notify));
 
-    let routes_with_middleware = Router::new();
+    //    let routes_with_middleware = Router::new();
+
+    let internal_routes = Router::new()
+        .route("/internal/global_message", post(noties::global_message))
+        .layer(axum::middleware::from_fn(
+            crate::middleware::internal::basic_auth,
+        ));
 
     Router::new()
-        .merge(routes_with_middleware)
+        //        .merge(routes_with_middleware)
         .merge(routes_without_middleware)
+        .merge(internal_routes)
         .merge(SwaggerUi::new("/swegger-ui").url("/api-docs/openapi.json", DaApiDoc::openapi()))
         .with_state(app_state)
 }
