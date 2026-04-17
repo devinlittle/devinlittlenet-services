@@ -28,8 +28,10 @@ pub async fn notify(
     ws.on_upgrade(move |mut socket| async move {
         if uuid == "global" {
             let mut global_rx = state.global_channel.subscribe();
-            if let Ok(msg) = global_rx.recv().await && socket.send(Message::Text(msg.into())).await.is_err() {
-                return;
+            while let Ok(msg) = global_rx.recv().await {
+                if socket.send(Message::Text(msg.into())).await.is_err() {
+                    break;
+                }
             }
             return;
         }
@@ -50,7 +52,7 @@ pub async fn notify(
             Err(_) => return,
         };
         if !state.connected_users.contains_key(&uuid) {
-           let (tx, _) = broadcast::channel::<String>(32);
+            let (tx, _) = broadcast::channel::<String>(32);
             state.connected_users.insert(uuid, tx);
         }
         socket
@@ -118,7 +120,8 @@ pub async fn notify(
             }
         }
         // Pruning disconnecting user from connected users
-        let should_remove = state.connected_users
+        let should_remove = state
+            .connected_users
             .get(&uuid)
             .map(|user_tx| {
                 tracing::trace!("receiver_count for {}: {}", uuid, user_tx.receiver_count());
@@ -130,7 +133,6 @@ pub async fn notify(
             state.connected_users.remove(&uuid);
             tracing::trace!("Removed {} from connected_users", uuid);
         }
-
     })
 }
 
