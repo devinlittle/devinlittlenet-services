@@ -118,12 +118,17 @@ pub async fn notify(
             }
         }
         // Pruning disconnecting user from connected users
-        if let Some(user_tx) = state.connected_users.get(&uuid) {
-            tracing::trace!("receiver_count for {}: {}", uuid, user_tx.receiver_count());
-            if user_tx.receiver_count() == 0 {
-                state.connected_users.remove(&uuid);
-                tracing::trace!("Removed {} from connected_users", uuid);
-            }
+        let should_remove = state.connected_users
+            .get(&uuid)
+            .map(|user_tx| {
+                tracing::trace!("receiver_count for {}: {}", uuid, user_tx.receiver_count());
+                user_tx.receiver_count() == 0
+            })
+            .unwrap_or(false);
+
+        if should_remove {
+            state.connected_users.remove(&uuid);
+            tracing::trace!("Removed {} from connected_users", uuid);
         }
 
     })
