@@ -24,6 +24,7 @@ use crate::{
     util::{
         hash::{hash, hash_password, verify_password},
         random::generate_random_string,
+        secrets::SECRETS,
     },
 };
 
@@ -232,8 +233,7 @@ pub async fn delete_handler(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let internal_api_key =
-        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+    let internal_api_key = &SECRETS.internal_api_key;
 
     match sqlx::query!("DELETE FROM users WHERE id = $1", user.uuid)
         .execute(&pool)
@@ -370,7 +370,7 @@ pub fn generate_jwt(
     iat: OffsetDateTime,
     exp: OffsetDateTime,
 ) -> Result<String, StatusCode> {
-    let jwt_secret = dotenvy::var("JWT_SECRET").unwrap();
+    let jwt_secret = &SECRETS.jwt_secret;
 
     let claims = Claims {
         sub,

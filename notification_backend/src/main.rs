@@ -57,10 +57,7 @@ async fn main() {
 
     let app = Router::new().merge(routes::create_routes().layer(cors));
 
-    let host_on = format!(
-        "0.0.0.0:{}",
-        dotenvy::var("PORT").expect("PORT env var not found")
-    );
+    let host_on = "0.0.0.0:3003";
 
     let handle = axum_server::Handle::new();
     let shutdown_signal_handler = shutdown_signal(handle.clone());

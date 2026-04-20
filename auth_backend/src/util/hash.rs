@@ -6,8 +6,10 @@ use constant_time_eq::constant_time_eq;
 use hyper::StatusCode;
 use sha2::{Digest, Sha256};
 
+use crate::util::secrets::SECRETS;
+
 pub fn hash_password(password: String) -> Result<String, StatusCode> {
-    let salt = dotenvy::var("HASH_SECRET").expect("HASH_SECRET must be set in .env file");
+    let salt = &SECRETS.hash_secret;
     let salt = SaltString::encode_b64(salt.as_bytes()).expect("SaltString initilization");
 
     let argon2 = Argon2::default();
@@ -22,6 +24,7 @@ pub fn hash_password(password: String) -> Result<String, StatusCode> {
     Ok(password_hash)
 }
 
+#[allow(clippy::needless_return)]
 pub fn verify_password(original: &str, hashed_password: &str) -> bool {
     let argon2 = Argon2::default();
 
@@ -36,12 +39,13 @@ pub fn verify_password(original: &str, hashed_password: &str) -> bool {
 
 pub fn hash(data: &str) -> String {
     let mut hasher = Sha256::new();
-    let salt = dotenvy::var("HASH_SECRET").expect("HASH_SECRET must be set in .env file");
+    let salt = &SECRETS.hash_secret;
     hasher.update(salt);
     hasher.update(data);
     format!("{:x}", hasher.finalize())
 }
 
+//  XXX: depricated, used by old login auth; still might have uses later...
 #[allow(dead_code)]
 pub fn validate(original: &str, hashed: &str) -> bool {
     let original_hashed = hash(original);

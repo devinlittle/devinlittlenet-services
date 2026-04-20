@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::middleware::jwt::AuthenticatedUser;
+use crate::{middleware::jwt::AuthenticatedUser, util::secrets::SECRETS};
 
 #[derive(Serialize)]
 pub struct Users {
@@ -203,8 +203,7 @@ pub async fn evict_from_hashset(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let internal_api_key =
-        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+    let internal_api_key = &SECRETS.internal_api_key;
 
     let client = reqwest::Client::new();
 
@@ -254,8 +253,7 @@ pub async fn delete_by_id(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let internal_api_key =
-        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+    let internal_api_key = &SECRETS.internal_api_key;
 
     match sqlx::query!("DELETE FROM users WHERE id = $1", target_id)
         .execute(&pool)
@@ -312,8 +310,7 @@ pub async fn global_message(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let internal_api_key =
-        dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
+    let internal_api_key = &SECRETS.internal_api_key;
 
     let client = reqwest::Client::new();
 

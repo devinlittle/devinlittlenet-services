@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 
+use crate::util::secrets::SECRETS;
+
 #[derive(Clone, ToSchema)]
 pub struct AuthenticatedUser {
     pub username: String,
@@ -32,11 +34,7 @@ pub async fn jwt_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
-    let decoding_key = DecodingKey::from_secret(
-        dotenvy::var("JWT_SECRET")
-            .expect("failed to read jwt secret var")
-            .as_bytes(),
-    );
+    let decoding_key = DecodingKey::from_secret(SECRETS.jwt_secret.as_bytes());
 
     let decoded_jwt = jsonwebtoken::decode::<Claims>(bearer.token(), &decoding_key, &validation)
         .map(|x| x.claims)

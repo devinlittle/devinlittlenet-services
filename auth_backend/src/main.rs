@@ -10,6 +10,8 @@ use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+use crate::util::secrets::SECRETS;
+
 mod middleware;
 mod routes;
 mod util;
@@ -45,21 +47,18 @@ async fn main() {
         .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCESS_CONTROL_ALLOW_ORIGIN])
         .allow_credentials(true);
 
-    let database_string = dotenvy::var("DATABASE_URL").expect("DATABASE_URL env_var not found");
+    let database_string = &SECRETS.database_url;
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(3))
-        .connect(&database_string)
+        .connect(database_string)
         .await
         .expect("can't connect to database");
 
     let app = Router::new().merge(routes::create_routes(pool.clone()).layer(cors));
 
-    let host_on = format!(
-        "0.0.0.0:{}",
-        dotenvy::var("PORT").expect("PORT env var not found")
-    );
+    let host_on = "0.0.0.0:3000";
 
     let handle = axum_server::Handle::new();
     let shutdown_signal_handler = shutdown_signal(handle.clone());

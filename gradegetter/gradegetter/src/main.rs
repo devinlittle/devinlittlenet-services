@@ -30,18 +30,21 @@ use uuid::Uuid;
 use tracing::{debug, error, info, trace};
 use tracing_subscriber::EnvFilter;
 
+use crate::secrets::SECRETS;
+mod secrets;
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let database_string = dotenvy::var("DATABASE_URL").expect("DATABASE_URL not found");
+    let database_string = &SECRETS.database_url;
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(3))
-        .connect(&database_string)
+        .connect(database_string)
         .await
         .context("failed to connect to database")?;
 
@@ -383,7 +386,7 @@ async fn get_token(
         let mut request =
             "ws://gradegetter_backend:3002/internal/forward_ws".into_client_request()?;
 
-        let internal_api = dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY var missing");
+        let internal_api = &SECRETS.internal_api_key;
 
         request
             .headers_mut()

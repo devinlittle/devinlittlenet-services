@@ -5,13 +5,15 @@ use axum_extra::{
 };
 use base64::prelude::*;
 
+use crate::utils::secrets::SECRETS;
+
 pub async fn basic_auth(
     TypedHeader(Authorization(basic)): TypedHeader<Authorization<Basic>>,
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
     let internal_api = BASE64_STANDARD
-        .decode(dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY var missing"))
+        .decode(&SECRETS.internal_api_key)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let internal_api =

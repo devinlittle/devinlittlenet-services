@@ -14,7 +14,7 @@ use std::sync::Arc;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 
-use crate::routes::AppState;
+use crate::{routes::AppState, utils::secrets::SECRETS};
 
 #[derive(Clone, ToSchema, Debug)]
 pub struct AuthenticatedUser {
@@ -42,11 +42,7 @@ pub async fn jwt_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
-    let decoding_key = DecodingKey::from_secret(
-        dotenvy::var("JWT_SECRET")
-            .expect("failed to read jwt secret var")
-            .as_bytes(),
-    );
+    let decoding_key = DecodingKey::from_secret(SECRETS.jwt_secret.as_bytes());
 
     let decoded_jwt = jsonwebtoken::decode::<Claims>(bearer.token(), &decoding_key, &validation)
         .map(|x| x.claims)
@@ -113,16 +109,13 @@ pub async fn jwt_auth(
 
         let client = reqwest::Client::new();
 
-        let internal_api_key =
-            dotenvy::var("INTERNAL_API_KEY").expect("INTERNAL_API_KEY env var missing");
-
         let db_role = client
             .get(format!(
                 "http://auth_backend:3000/internal/users/{uuid}/roles"
             ))
             .header(
                 "Authorization",
-                format!("Basic {}", internal_api_key.as_str()),
+                format!("Basic {}", &SECRETS.internal_api_key.as_str()),
             )
             .send()
             .await
