@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
-"auth_backend/", "notification_backend/", "gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/"]
+"auth_backend/", "notification_backend/", "gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/", "nanopass_backend/"]
 
 
 [workspace.dependencies]

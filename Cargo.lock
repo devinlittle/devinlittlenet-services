@@ -1711,6 +1711,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "nanopass_backend"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "axum-server",
+ "base64",
+ "constant_time_eq",
+ "crypto_utils",
+ "dashmap",
+ "dotenvy",
+ "hyper",
+ "hyper-tls",
+ "jsonwebtoken",
+ "openssl",
+ "reqwest",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "uuid",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -4,12 +4,14 @@ use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
 };
-use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::broadcast};
 use uuid::Uuid;
 
-use crate::{routes::AppState, utils::jwt::jwt_parse};
+use crate::{
+    routes::AppState,
+    utils::{jwt::jwt_parse, secrets::SECRETS},
+};
 
 #[utoipa::path(
     get,
@@ -56,8 +58,6 @@ pub async fn notify(
             Err(_) => return,
         };
 
-        let sessoin_id = bootstrap_json.session_id;
-
         if user.uuid != uuid {
             socket
                 .send(
@@ -71,6 +71,8 @@ pub async fn notify(
                 .unwrap_or_default();
             return;
         }
+
+        let session_id = bootstrap_json.session_id;
 
         if !state.connected_users.contains_key(&uuid) {
             let (tx, _) = broadcast::channel::<String>(32);
@@ -140,6 +142,23 @@ pub async fn notify(
                 },
             }
         }
+
+        let remove_ses = RemoveSessionInternalInput {
+            user_id: user.uuid,
+            session_id,
+        };
+
+        let _ = reqwest::Client::new()
+            .post("http://nanopass_backend:3004/internal/session_cleanup")
+            .header(
+                "Authorization",
+                format!("Basic {}", SECRETS.internal_api_key.as_str()),
+            )
+            .json(&remove_ses)
+            .send()
+            .await
+            .map_err(|err| tracing::error!("failed to send message: {}", err));
+
         // Pruning disconnecting user from connected users
         let should_remove = state
             .connected_users
@@ -169,20 +188,8 @@ struct SendNotification {
     content: String,
 }
 
-pub async fn user_message(
-    State(state): State<AppState>,
-    Path(uuid): Path<String>,
-    message: String,
-) -> StatusCode {
-    let uuid = match Uuid::from_str(uuid.as_str()) {
-        Ok(uuid) => uuid,
-        Err(_) => return StatusCode::UNAUTHORIZED,
-    };
-
-    let Some(tx) = state.connected_users.get(&uuid) else {return StatusCode::INTERNAL_SERVER_ERROR};
-
-    match tx.send(message) {
-        Ok(_) => StatusCode::OK,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
+#[derive(Serialize)]
+pub struct RemoveSessionInternalInput {
+    pub user_id: Uuid,
+    pub session_id: Uuid,
 }

@@ -68,6 +68,10 @@ pub fn create_routes() -> Router {
 
     let internal_routes = Router::new()
         .route("/internal/global_message", post(internal::global_message))
+        .route(
+            "/internal/user_message/{uuid}",
+            post(internal::user_message),
+        )
         .layer(axum::middleware::from_fn(
             crate::middleware::internal::basic_auth,
         ));
