@@ -203,6 +203,8 @@ async fn main() -> Result<(), anyhow::Error> {
                                     axum::http::StatusCode::INTERNAL_SERVER_ERROR
                                 });
 
+                                notify_updated_grades(id).await;
+
                                 info!("Updated grades for UUID: {}", id);
                             }
                             Err(e) => {
@@ -753,4 +755,27 @@ fn parse_grades_html(html: String) -> Result<GradesHashMap, anyhow::Error> {
     }
 
     Ok(course_grades)
+}
+
+async fn notify_updated_grades(user_id: Uuid) {
+    let message = serde_json::json!({
+        "namespace": "gradegetter",
+        "payload": "GradesUpdated"
+    });
+
+    let url = format!(
+        "http://notification_backend:3003/internal/user_message/{}",
+        user_id
+    );
+
+    let _ = reqwest::Client::new()
+        .post(url)
+        .header(
+            "Authorization",
+            format!("Basic {}", SECRETS.internal_api_key.as_str()),
+        )
+        .json(&message)
+        .send()
+        .await
+        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
 }

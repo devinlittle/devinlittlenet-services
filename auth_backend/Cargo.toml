@@ -17,7 +17,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 rustls = {workspace = true, features = ["ring"]}
 ring.workspace = true
-reqwest.workspace = true
+reqwest = {workspace = true, features = ["json"]}
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"]  }
 anyhow.workspace = true

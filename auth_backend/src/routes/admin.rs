@@ -5,7 +5,7 @@ use axum::{
 };
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -304,7 +304,7 @@ pub async fn delete_by_id(
 )]
 pub async fn global_message(
     Extension(user): Extension<AuthenticatedUser>,
-    Json(req): Json<Message>,
+    Json(req): Json<MessageFromFrontend>,
 ) -> Result<impl IntoResponse, StatusCode> {
     if user.role != "devin" && user.role != "owen" {
         return Err(StatusCode::FORBIDDEN);
@@ -314,12 +314,18 @@ pub async fn global_message(
 
     let client = reqwest::Client::new();
 
-    let message = serde_json::to_value(Message {
-        r#type: "global".to_string(),
+    let payload = NotificationPayload {
+        r#type: NotificationType::Global,
         title: req.title,
         content: req.content,
-    })
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    };
+
+    let payload = serde_json::to_value(payload).unwrap_or_default();
+
+    let message = Message {
+        namespace: MessageNamespace::Notification,
+        payload,
+    };
 
     let _ = client
         .post("http://notification_backend:3003/internal/global_message")
@@ -327,7 +333,7 @@ pub async fn global_message(
             "Authorization",
             format!("Basic {}", internal_api_key.as_str()),
         )
-        .body(message.to_string())
+        .json(&message)
         .send()
         .await
         .map_err(|err| tracing::error!("failed to send message: {}", err));
@@ -335,9 +341,35 @@ pub async fn global_message(
     Ok((axum::http::StatusCode::OK).into_response())
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct Message {
-    r#type: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MessageFromFrontend {
     title: String,
     content: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct Message {
+    pub namespace: MessageNamespace,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageNamespace {
+    Notification,
+    Nanopass,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct NotificationPayload {
+    pub r#type: NotificationType,
+    pub title: String,
+    pub content: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum NotificationType {
+    Global,
+    User,
 }
