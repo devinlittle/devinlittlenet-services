@@ -8,6 +8,7 @@ use crate::utils::secrets::SECRETS;
 
 #[derive(Clone, ToSchema, Debug)]
 pub struct AuthenticatedUser {
+    #[allow(dead_code)]
     pub username: String,
     pub uuid: uuid::Uuid,
     #[allow(dead_code)]

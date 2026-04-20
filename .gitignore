@@ -2,6 +2,7 @@
 /target/
 node_modules/
 recordings/
+build.sh
 
 # OS Specific
 .DS_STORE

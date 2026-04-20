@@ -4,6 +4,7 @@ use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
 };
+use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::broadcast};
 use uuid::Uuid;
@@ -42,8 +43,11 @@ pub async fn notify(
         if !msg.contains("BOOTSTRAP") {
             return;
         }
-        let Some(token) = msg.find(":").map(|x| &msg[x + 1..]) else { return; };
-        let user = match jwt_parse(token).await {
+        let Some(bootstrap_json) = msg.find(":").map(|x| &msg[x + 1..]) else { return; };
+
+        let Ok(bootstrap_json) = serde_json::from_str::<Bootstrap>(bootstrap_json) else { return; };
+
+        let user = match jwt_parse(&bootstrap_json.token).await {
             Ok(user) => user,
             Err(_) => return,
         };
@@ -51,6 +55,8 @@ pub async fn notify(
             Ok(uuid) => uuid,
             Err(_) => return,
         };
+
+        let sessoin_id = bootstrap_json.session_id;
 
         if user.uuid != uuid {
             socket
@@ -152,8 +158,31 @@ pub async fn notify(
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct Bootstrap {
+    token: String,
+    session_id: Uuid,
+}
 
+#[derive(Serialize, Deserialize, Debug)]
 struct SendNotification {
     recipient: String,
     content: String,
+}
+
+pub async fn user_message(
+    State(state): State<AppState>,
+    Path(uuid): Path<String>,
+    message: String,
+) -> StatusCode {
+    let uuid = match Uuid::from_str(uuid.as_str()) {
+        Ok(uuid) => uuid,
+        Err(_) => return StatusCode::UNAUTHORIZED,
+    };
+
+    let Some(tx) = state.connected_users.get(&uuid) else {return StatusCode::INTERNAL_SERVER_ERROR};
+
+    match tx.send(message) {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }
