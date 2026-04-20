@@ -4,9 +4,7 @@ kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
   annotations:
-    {{- if .Values.ingress.additionalAnnotations }}
-    {{- toYaml .Values.ingress.additionalAnnotations | nindent 4 }}
-    {{- end }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
   ingressClassName: {{ .Values.ingress.class }}
   {{- if .Values.ingress.tls }}
@@ -20,17 +18,17 @@ spec:
       http:
         paths:
           - path: /gradegetter/
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
-                name: gradegetter_backend
+                name: gradegetter-backend
                 port:
                   number: 3002
           - path: /auth/
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
-                name: auth_backend
+                name: auth-backend
                 port:
                   number: 3000
 {{- end }}

@@ -1,16 +1,17 @@
+{{- $ab := index .Values "auth-backend" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth_backend
+  name: auth-backend
 spec:
-  replicas: {{ .Values.auth_backend.replicaCount }}
+  replicas: {{ $ab.replicaCount }}
   selector:
     matchLabels:
-      app: auth_backend
+      app: auth-backend
   template:
     metadata:
       labels:
-        app: auth_backend
+        app: auth-backend
     spec:
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
@@ -21,30 +22,29 @@ spec:
             - sh
             - -c
             - until nc -z {{ .Release.Name }}-postgresql 5432; do echo "waiting"; sleep 2; done
-
         - name: run-migrations
-          image: "{{ .Values.auth_backend.image.repository }}:{{ .Values.auth_backend.image.tag }}"
+          image: "{{ $ab.image.repository }}:{{ $ab.image.tag }}"
           command: ["/bin/sqlx", "migrate", "run", "--source", "/migrations"]
           env:
             - name: DATABASE_URL
               value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
       containers:
-        - name: auth_backend
-          image: "{{ .Values.auth_backend.image.repository }}:{{ .Values.auth_backend.image.tag }}"
-          imagePullPolicy: {{ .Values.auth_backend.image.pullPolicy }}
+        - name: auth-backend
+          image: "{{ $ab.image.repository }}:{{ $ab.image.tag }}"
+          imagePullPolicy: {{ $ab.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.auth_backend.port }}
+            - containerPort: {{ $ab.port }}
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.auth_backend.port }}
+              port: {{ $ab.port }}
             initialDelaySeconds: 10
             periodSeconds: 15
           env:
             - name: PORT
-              value: {{ .Values.auth_backend.port | quote }}
+              value: {{ $ab.port | quote }}
             - name: RUST_LOG
-              value: {{ .Values.auth_backend.env.RUST_LOG }}
+              value: {{ $ab.env.RUST_LOG }}
             - name: DATABASE_URL
               value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
             - name: HASH_SECRET

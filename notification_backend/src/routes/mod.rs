@@ -10,6 +10,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
 
+mod internal;
 mod noties;
 
 #[derive(OpenApi)]
@@ -66,7 +67,7 @@ pub fn create_routes() -> Router {
     //    let routes_with_middleware = Router::new();
 
     let internal_routes = Router::new()
-        .route("/internal/global_message", post(noties::global_message))
+        .route("/internal/global_message", post(internal::global_message))
         .layer(axum::middleware::from_fn(
             crate::middleware::internal::basic_auth,
         ));

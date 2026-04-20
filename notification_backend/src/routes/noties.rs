@@ -4,7 +4,6 @@ use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
 };
-use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::{select, sync::broadcast};
 use uuid::Uuid;
@@ -44,7 +43,7 @@ pub async fn notify(
             return;
         }
         let Some(token) = msg.find(":").map(|x| &msg[x + 1..]) else { return; };
-        let _ = match jwt_parse(token).await {
+        let user = match jwt_parse(token).await {
             Ok(user) => user,
             Err(_) => return,
         };
@@ -52,6 +51,21 @@ pub async fn notify(
             Ok(uuid) => uuid,
             Err(_) => return,
         };
+
+        if user.uuid != uuid {
+            socket
+                .send(
+                    format!(
+                        "UUID in Token doesn't match with websocket path; {} != {}",
+                        user.uuid, uuid
+                    )
+                    .into(),
+                )
+                .await
+                .unwrap_or_default();
+            return;
+        }
+
         if !state.connected_users.contains_key(&uuid) {
             let (tx, _) = broadcast::channel::<String>(32);
             state.connected_users.insert(uuid, tx);
@@ -142,12 +156,4 @@ pub async fn notify(
 struct SendNotification {
     recipient: String,
     content: String,
-}
-
-//#[utoipa::path(get, path = "/internal/global_message")]
-pub async fn global_message(State(state): State<AppState>, message: String) -> StatusCode {
-    match state.global_channel.send(message) {
-        Ok(_) => StatusCode::OK,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
 }

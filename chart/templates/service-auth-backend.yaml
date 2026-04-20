@@ -1,10 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth_backend
+  name: auth-backend
 spec:
   selector:
-    app: auth_backend
+    app: auth-backend
   ports:
-    - port: 3000
+    - protocol: TCP
+      port: 3000
       targetPort: 3000

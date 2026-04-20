@@ -1,21 +1,15 @@
 postgresql:
   enabled: true
-  databases:
-    - name: auth
-      owners: devin
-    - name: gg
-      owners: devin
-  users:
-    - name: devin
-      password: password
   auth:
     username: devin
     password: password
     database: auth
-  gg:
-    database: gg
+  initdbScripts:
+    init.sql: |
+      CREATE DATABASE gg;
+      GRANT ALL PRIVILEGES ON DATABASE gg TO devin;
 
-auth_backend:
+auth-backend:
   image:
     repository: 10.10.10.245:5000/devin/auth_backend
     tag: "stable"
@@ -25,8 +19,7 @@ auth_backend:
   env:
     RUST_LOG: info
 
-
-gradegetter_backend:
+gradegetter-backend:
   image:
     repository: 10.10.10.245:5000/devin/gradegetter_backend
     tag: "stable"
@@ -52,6 +45,7 @@ imagePullSecret: registry-creds
 
 ingress:
   enabled: true
-  hostname: api.exmaple.com
+  hostname: api.example.com
+  class: nginx
   annotations:
     kubernetes.io/ingress.class: nginx

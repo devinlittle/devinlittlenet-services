@@ -1,16 +1,17 @@
+{{- $gb := index .Values "gradegetter-backend" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gradegetter_backend
+  name: gradegetter-backend
 spec:
-  replicas: {{ .Values.gradegetter_backend.replicaCount }}
+  replicas: {{ $gb.replicaCount }}
   selector:
     matchLabels:
-      app: gradegetter_backend
+      app: gradegetter-backend
   template:
     metadata:
       labels:
-        app: gradegetter_backend
+        app: gradegetter-backend
     spec:
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
@@ -21,32 +22,31 @@ spec:
             - sh
             - -c
             - until nc -z {{ .Release.Name }}-postgresql 5432; do echo "waiting"; sleep 2; done
-
         - name: run-migrations
-          image: "{{ .Values.gradegetter_backend.image.repository }}:{{ .Values.gradegetter_backend.image.tag }}"
+          image: "{{ $gb.image.repository }}:{{ $gb.image.tag }}"
           command: ["/bin/sqlx", "migrate", "run", "--source", "/migrations"]
           env:
             - name: DATABASE_URL
-              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.gg.database }}"
+              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/gg"
       containers:
-        - name: gradegetter_backend
-          image: "{{ .Values.gradegetter_backend.image.repository }}:{{ .Values.gradegetter_backend.image.tag }}"
-          imagePullPolicy: {{ .Values.gradegetter_backend.image.pullPolicy }}
+        - name: gradegetter-backend
+          image: "{{ $gb.image.repository }}:{{ $gb.image.tag }}"
+          imagePullPolicy: {{ $gb.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.gradegetter_backend.port }}
+            - containerPort: {{ $gb.port }}
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.gradegetter_backend.port }}
+              port: {{ $gb.port }}
             initialDelaySeconds: 10
             periodSeconds: 15
           env:
             - name: PORT
-              value: {{ .Values.gradegetter_backend.port | quote }}
+              value: {{ $gb.port | quote }}
             - name: RUST_LOG
-              value: {{ .Values.gradegetter_backend.env.RUST_LOG }}
+              value: {{ $gb.env.RUST_LOG }}
             - name: DATABASE_URL
-              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.gg.database }}"
+              value: "postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ .Release.Name }}-postgresql:5432/gg"
             - name: HASH_SECRET
               valueFrom:
                 secretKeyRef:
