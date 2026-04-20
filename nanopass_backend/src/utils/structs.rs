@@ -33,6 +33,8 @@ pub struct FileListingInput {
     pub filename: String,
     pub size_bytes: u64,
     pub mime_type: String,
+    #[serde(with = "jwt_numeric_date")]
+    pub created_at: OffsetDateTime,
     pub visibility: Visibility,
 }
 

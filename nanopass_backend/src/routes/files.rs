@@ -1,4 +1,4 @@
-use axum::{extract::State, Extension, Json};
+use axum::{extract::State, response::IntoResponse, Extension, Json};
 use hyper::StatusCode;
 use serde::Deserialize;
 use time::OffsetDateTime;
@@ -22,7 +22,7 @@ use crate::{
         ("bearer_auth" = []),
     ),
     responses(
-        (status = 200, description = "listing created", body = String),
+        (status = 200, description = "listing created", body = FileListing),
         (status = 500, description = "uhmmm...failed", body = String),
     ),
     tag = "file_listings"
@@ -31,7 +31,7 @@ pub async fn create_listing(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<FileListingInput>,
-) -> StatusCode {
+) -> impl IntoResponse {
     let file_listing = FileListing {
         id: Uuid::new_v4(),
         owner_id: user.uuid,
@@ -49,9 +49,9 @@ pub async fn create_listing(
         .is_none()
     {
         notify_listing_added(&file_listing, &state.client, &SECRETS.internal_api_key).await;
-        StatusCode::OK
+        Json(file_listing).into_response()
     } else {
-        StatusCode::INTERNAL_SERVER_ERROR
+        StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
 

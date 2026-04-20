@@ -10,6 +10,8 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
 
+use crate::middleware::jwt::jwt_auth;
+
 mod internal;
 mod noties;
 
@@ -25,11 +27,29 @@ mod noties;
             crate::utils::jwt::Claims,
         )
     ),
+    modifiers(&JwtBearer),
     tags(
         (name = "ws", description = "The websocket")
     )
 )]
 pub struct DaApiDoc;
+
+struct JwtBearer;
+
+impl utoipa::Modify for JwtBearer {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                utoipa::openapi::security::SecurityScheme::Http(
+                    utoipa::openapi::security::Http::new(
+                        utoipa::openapi::security::HttpAuthScheme::Bearer,
+                    ),
+                ),
+            )
+        }
+    }
+}
 
 #[utoipa::path(
 get,
@@ -64,7 +84,9 @@ pub fn create_routes() -> Router {
         .route("/health", get(health))
         .route("/ws/{uuid}", get(noties::notify));
 
-    //    let routes_with_middleware = Router::new();
+    let routes_with_middleware = Router::new()
+        .route("/user_message/{uuid}", post(noties::user_message))
+        .layer(axum::middleware::from_fn(jwt_auth));
 
     let internal_routes = Router::new()
         .route("/internal/global_message", post(internal::global_message))
@@ -77,7 +99,7 @@ pub fn create_routes() -> Router {
         ));
 
     Router::new()
-        //        .merge(routes_with_middleware)
+        .merge(routes_with_middleware)
         .merge(routes_without_middleware)
         .merge(internal_routes)
         .merge(SwaggerUi::new("/swegger-ui").url("/api-docs/openapi.json", DaApiDoc::openapi()))

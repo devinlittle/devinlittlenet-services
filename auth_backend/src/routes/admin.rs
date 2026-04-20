@@ -286,6 +286,12 @@ pub async fn delete_by_id(
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct MessageFromFrontend {
+    title: String,
+    content: String,
+}
+
 #[utoipa::path(
     post,
     path = "/admin/global_message",
@@ -299,7 +305,7 @@ pub async fn delete_by_id(
         (status = 404, description = "user not found"),
         (status = 500, description = "Interal Server Error")
     ),
-    request_body = Message,
+    request_body = MessageFromFrontend,
     tag = "admin"
 )]
 pub async fn global_message(
@@ -339,12 +345,6 @@ pub async fn global_message(
         .map_err(|err| tracing::error!("failed to send message: {}", err));
 
     Ok((axum::http::StatusCode::OK).into_response())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MessageFromFrontend {
-    title: String,
-    content: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
