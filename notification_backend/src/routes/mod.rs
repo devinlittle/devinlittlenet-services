@@ -2,6 +2,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum_prometheus::PrometheusMetricLayerBuilder;
 use dashmap::DashMap;
 use hyper::StatusCode;
 use std::sync::Arc;
@@ -80,9 +81,15 @@ pub fn create_routes() -> Router {
         global_channel,
     };
 
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
+        .with_prefix("auth_backend")
+        .with_default_metrics()
+        .build_pair();
+
     let routes_without_middleware = Router::new()
         .route("/health", get(health))
-        .route("/ws/{uuid}", get(noties::notify));
+        .route("/ws/{uuid}", get(noties::notify))
+        .route("/metrics", get(|| async move { metric_handle.render() }));
 
     let routes_with_middleware = Router::new()
         .route("/user_message/{uuid}", post(noties::user_message))
@@ -104,4 +111,5 @@ pub fn create_routes() -> Router {
         .merge(internal_routes)
         .merge(SwaggerUi::new("/swegger-ui").url("/api-docs/openapi.json", DaApiDoc::openapi()))
         .with_state(app_state)
+        .layer(prometheus_layer)
 }
