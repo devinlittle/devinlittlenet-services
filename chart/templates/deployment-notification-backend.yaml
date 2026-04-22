@@ -1,0 +1,42 @@
+{{- $nob := index .Values "notification-backend" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-backend
+spec:
+  replicas: {{ $nob.replicaCount }}
+  selector:
+    matchLabels:
+      app: notification-backend
+  template:
+    metadata:
+      labels:
+        app: notification-backend
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: notification-backend
+          image: "{{ $nob.image.repository }}:{{ $nob.image.tag }}"
+          imagePullPolicy: {{ $nob.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $nob.port }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $nob.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          env:
+            - name: RUST_LOG
+              value: {{ $nob.env.RUST_LOG }}
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: INTERNAL_API_KEY
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: JWT_SECRET

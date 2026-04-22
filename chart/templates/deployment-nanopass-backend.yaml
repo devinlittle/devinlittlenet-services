@@ -1,0 +1,42 @@
+{{- $nab:= index .Values "nanopass-backend" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopass-backend
+spec:
+  replicas: {{ $nab.replicaCount }}
+  selector:
+    matchLabels:
+      app: nanopass-backend
+  template:
+    metadata:
+      labels:
+        app: nanopass-backend
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: nanopass-backend
+          image: "{{ $nab.image.repository }}:{{ $nab.image.tag }}"
+          imagePullPolicy: {{ $nab.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $nab.port }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $nab.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          env:
+            - name: RUST_LOG
+              value: {{ $nab.env.RUST_LOG }}
+            - name: INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: INTERNAL_API_KEY
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: JWT_SECRET

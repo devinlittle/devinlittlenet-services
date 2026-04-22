@@ -3,17 +3,10 @@
 ## Setup
 
 ```bash
-cp ./backend/env.template ./.env
-# To generate ENCRYPTION_KEY...
-echo $(openssl rand -base64 32) >> .env
-# Adjust ENV VARS to 
-cargo build --release --bin auth_backend
+cp ./env.template ./.env
+# The INTERNAL_API_KEY var is just (username:password) but base64 encoded
 ```
 
-# Routes:
+## When deployed, all routes have an OpenAPI Doc accesable thru "/api-docs/openapi.json" and a swagger-ui too located at /swegger-ui
 
-| Route                         | Input                                                                                                                                                                             | Function                             |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `/auth/register`              | {<br/>    "username": "devin",<br/>    "password": "password"<br/>}                                                                                                               | Adds user to database                |
-| `/auth/login`                 | {<br/> "username": "devin",<br/> "password": "password"<br/>}                                                                                                                     | returns JWT if login info is correct |
 

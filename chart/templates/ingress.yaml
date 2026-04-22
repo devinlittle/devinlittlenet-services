@@ -17,13 +17,6 @@ spec:
     - host: {{ .Values.ingress.hostname }}
       http:
         paths:
-          - path: /gradegetter/
-            pathType: Prefix
-            backend:
-              service:
-                name: gradegetter-backend
-                port:
-                  number: 3002
           - path: /auth/
             pathType: Prefix
             backend:
@@ -31,4 +24,26 @@ spec:
                 name: auth-backend
                 port:
                   number: 3000
+          - path: /gradegetter/
+            pathType: Prefix
+            backend:
+              service:
+                name: gradegetter-backend
+                port:
+                  number: 3002
+          - path: /notification/
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-backend
+                port:
+                  number: 3003
+          - path: /nanopass/
+            pathType: Prefix
+            backend:
+              service:
+                name: nanopass-backend
+                port:
+                  number: 3004
+
 {{- end }}
