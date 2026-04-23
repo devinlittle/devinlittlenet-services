@@ -1,49 +1,82 @@
 {{- if .Values.ingress.enabled }}
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-auth-prefix
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-notification-prefix
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /notification
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-nanopass-prefix
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /nanopass
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-gradegetter-prefix
+  namespace: {{ .Release.Namespace }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /gradegetter
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: {{ .Release.Name }}-ingress
-  annotations:
-    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
 spec:
-  ingressClassName: {{ .Values.ingress.class }}
-  {{- if .Values.ingress.tls }}
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/auth/`)
+      kind: Rule
+      middlewares:
+        - name: strip-auth-prefix
+      services:
+        - name: auth-backend
+          port: 3000
+    - match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/gradegetter/`)
+      kind: Rule
+      middlewares:
+        - name: strip-gradegetter-prefix
+      services:
+        - name: gradegetter-backend
+          port: 3002
+    - match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/notification/`)
+      kind: Rule
+      middlewares:
+        - name: strip-notification-prefix
+      services:
+        - name: notification-backend
+          port: 3003
+    - match: Host(`{{ .Values.ingress.hostname }}`) && PathPrefix(`/nanopass/`)
+      kind: Rule
+      middlewares:
+        - name: strip-nanopass-prefix
+      services:
+        - name: nanopass-backend
+          port: 3004
   tls:
-    - hosts:
-        - {{ .Values.ingress.hostname }}
-      secretName: {{ .Values.ingress.tlsSecret }}
-  {{- end }}
-  rules:
-    - host: {{ .Values.ingress.hostname }}
-      http:
-        paths:
-          - path: /auth/
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-backend
-                port:
-                  number: 3000
-          - path: /gradegetter/
-            pathType: Prefix
-            backend:
-              service:
-                name: gradegetter-backend
-                port:
-                  number: 3002
-          - path: /notification/
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-backend
-                port:
-                  number: 3003
-          - path: /nanopass/
-            pathType: Prefix
-            backend:
-              service:
-                name: nanopass-backend
-                port:
-                  number: 3004
-
+    secretName: {{ .Values.ingress.tlsSecret }}
 {{- end }}

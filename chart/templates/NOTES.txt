@@ -1,6 +1,6 @@
 DevinLitteNet Services deployed!!!
 
-Available at: http://{{ .Values.ingress.host }}
+Available at: http://{{ .Values.ingress.hostname }}
 
 Before deploying make sure you've created your secrets:
 

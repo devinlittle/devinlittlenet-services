@@ -312,7 +312,7 @@ pub async fn global_message(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<MessageFromFrontend>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+    if user.role != "devin" && user.role != "owen" && user.role != "courtney" {
         return Err(StatusCode::FORBIDDEN);
     }
 
