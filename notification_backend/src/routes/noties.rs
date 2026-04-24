@@ -1,4 +1,8 @@
-use std::str::FromStr;
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, RwLock},
+};
 
 use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
@@ -27,10 +31,10 @@ use crate::{
 pub async fn notify(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    Path(uuid): Path<String>,
+    Path(path_uuid): Path<String>,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |mut socket| async move {
-        if uuid == "global" {
+        if path_uuid == "global" {
             let mut global_rx = state.global_channel.subscribe();
             while let Ok(msg) = global_rx.recv().await {
                 if socket.send(Message::Text(msg.into())).await.is_err() {
@@ -54,7 +58,7 @@ pub async fn notify(
             Ok(user) => user,
             Err(_) => return,
         };
-        let uuid = match Uuid::from_str(uuid.as_str()) {
+        let uuid = match Uuid::from_str(path_uuid.as_str()) {
             Ok(uuid) => uuid,
             Err(_) => return,
         };
@@ -74,6 +78,20 @@ pub async fn notify(
         }
 
         let session_id = bootstrap_json.session_id;
+
+        // Populating online_users per user hashset!!
+        if let Some(hashset) = state.online_users.get(&uuid) {
+            let mut write = hashset.write().unwrap();
+            write.insert(session_id);
+            tracing::debug!("Added session to existing user entry: {:?}", *write);
+        } else {
+            let mut new_set = HashSet::new();
+            new_set.insert(session_id);
+            tracing::debug!("Created new user entry: {:?}", new_set);
+            state
+                .online_users
+                .insert(uuid, Arc::new(RwLock::new(new_set)));
+        }
 
         if !state.connected_users.contains_key(&uuid) {
             let (tx, _) = broadcast::channel::<String>(32);
@@ -149,31 +167,45 @@ pub async fn notify(
             session_id,
         };
 
-        let _ = reqwest::Client::new()
-            .post("http://nanopass_backend:3004/internal/session_cleanup")
-            .header(
-                "Authorization",
-                format!("Basic {}", SECRETS.internal_api_key.as_str()),
-            )
-            .json(&remove_ses)
-            .send()
-            .await
-            .map_err(|err| tracing::error!("failed to send message: {}", err));
+        tokio::spawn(async move {
+            let _ = reqwest::Client::new()
+                .post("http://nanopass_backend:3004/internal/session_cleanup")
+                .header(
+                    "Authorization",
+                    format!("Basic {}", SECRETS.internal_api_key.as_str()),
+                )
+                .json(&remove_ses)
+                .send()
+                .await
+                .map_err(|err| tracing::error!("failed to send session cleanup: {}", err));
+        });
 
-        // Pruning disconnecting user from connected users
-        let should_remove = state
-            .connected_users
-            .get(&uuid)
-            .map(|user_tx| {
-                tracing::trace!("receiver_count for {}: {}", uuid, user_tx.receiver_count());
-                user_tx.receiver_count() == 0
-            })
-            .unwrap_or(false);
+        // session clean up logic
+        tracing::debug!("SESSION LOGIC ABOUT TO RUN");
+        let is_empty = if let Some(hashset_ref) = state.online_users.get(&uuid) {
+            let mut write = match hashset_ref.write() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    tracing::error!("LOCK POISONED FOR USER {}", uuid);
+                    poisoned.into_inner()
+                }
+            };
 
-        if should_remove {
+            write.remove(&session_id);
+            write.is_empty()
+        } else {
+            false
+        };
+
+        if is_empty {
+            state.online_users.remove(&uuid);
             state.connected_users.remove(&uuid);
-            tracing::trace!("Removed {} from connected_users", uuid);
+            tracing::debug!("No sessions remaining for {}, removing entry", uuid);
+        } else {
+            tracing::debug!("session_id: {} removed for {}", session_id, uuid);
         }
+
+        tracing::debug!("this is connected_users: {:?}", state.connected_users);
     })
 }
 

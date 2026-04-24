@@ -4,6 +4,7 @@ node_modules/
 recordings/
 /recordings/
 build.sh
+dev_build.sh
 
 # OS Specific
 .DS_STORE

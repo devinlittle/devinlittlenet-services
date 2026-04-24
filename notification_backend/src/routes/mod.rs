@@ -5,7 +5,10 @@ use axum::{
 use axum_prometheus::PrometheusMetricLayerBuilder;
 use dashmap::DashMap;
 use hyper::StatusCode;
-use std::sync::Arc;
+use std::{
+    collections::HashSet,
+    sync::{Arc, RwLock},
+};
 use tokio::sync::broadcast;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -64,10 +67,13 @@ async fn health() -> StatusCode {
     StatusCode::OK
 }
 
+type OnlineUsers = Arc<DashMap<Uuid, Arc<RwLock<HashSet<Uuid>>>>>;
+
 #[derive(Clone)]
 pub struct AppState {
     pub connected_users: Arc<DashMap<Uuid, broadcast::Sender<String>>>,
     pub global_channel: Arc<broadcast::Sender<String>>,
+    pub online_users: OnlineUsers,
 }
 
 pub fn create_routes() -> Router {
@@ -76,9 +82,12 @@ pub fn create_routes() -> Router {
     let (global_tx, _) = broadcast::channel::<String>(32);
     let global_channel = Arc::new(global_tx);
 
+    let online_users: OnlineUsers = Arc::new(DashMap::new());
+
     let app_state = AppState {
         connected_users,
         global_channel,
+        online_users,
     };
 
     let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
