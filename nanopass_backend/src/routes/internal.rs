@@ -17,7 +17,7 @@ pub struct RemoveSessionInternalInput {
 
 #[utoipa::path(
     delete,
-    path = "/internal/session",
+    path = "/internal/session_cleanup",
     request_body = RemoveSessionInternalInput,
     security(
         ("bearer_auth" = []),

@@ -2,7 +2,7 @@
 
 ## WARNING, THIS IS BEING HEAVILY EDITED AND MAINTAINED RIGHT NOW
 
-## EXPEXCT VERY BAD DOCUMENTATION FOR A WHILE WHILE THE PROJECT GROWS
+## EXPECT VERY BAD DOCUMENTATION FOR A WHILE WHILE THE PROJECT GROWS
 
 This monorepo provides all of the services DevinLittle.net uses:
 
@@ -13,7 +13,7 @@ currnetly includes:
 * notification service
 * nanopass
 
-ports used: 
+ports used:
 
 * 3000 -- auth service
 * 3001 -- gradegetter service
