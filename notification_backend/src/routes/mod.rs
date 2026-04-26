@@ -67,11 +67,12 @@ async fn health() -> StatusCode {
     StatusCode::OK
 }
 
+type ConnectedUsers = Arc<DashMap<Uuid, broadcast::Sender<String>>>;
 type OnlineUsers = Arc<DashMap<Uuid, Arc<RwLock<HashSet<Uuid>>>>>;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub connected_users: Arc<DashMap<Uuid, broadcast::Sender<String>>>,
+    pub connected_users: ConnectedUsers,
     pub global_channel: Arc<broadcast::Sender<String>>,
     pub online_users: OnlineUsers,
 }
@@ -91,7 +92,7 @@ pub fn create_routes() -> Router {
     };
 
     let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
-        .with_prefix("auth_backend")
+        .with_prefix("notification_backend")
         .with_default_metrics()
         .build_pair();
 

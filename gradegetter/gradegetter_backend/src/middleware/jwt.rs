@@ -20,7 +20,6 @@ use crate::{routes::AppState, utils::secrets::SECRETS};
 pub struct AuthenticatedUser {
     pub username: String,
     pub uuid: uuid::Uuid,
-    #[allow(dead_code)]
     pub role: String,
 }
 

@@ -91,7 +91,7 @@ pub fn create_routes() -> Router {
     };
 
     let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
-        .with_prefix("auth_backend")
+        .with_prefix("nanopass_backend")
         .with_default_metrics()
         .build_pair();
 
@@ -100,7 +100,6 @@ pub fn create_routes() -> Router {
         .route("/metrics", get(|| async move { metric_handle.render() }));
 
     let routes_with_middleware = Router::new()
-        .layer(middleware::from_fn(jwt_auth))
         .route(
             "/listings",
             post(files::create_listing)
