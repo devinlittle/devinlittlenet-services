@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users SET\n            recovery_hash = COALESCE($1, recovery_hash),\n            encrypted_private_key = COALESCE($2, encrypted_private_key)\n        WHERE id = $3 ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e85986f73168afa41dad6097d32ea39be206c41b00ada3b277242a8be8945e54"
+}

@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            m.id, m.sender_id, u.username as sender_username,\n            m.ciphertext, m.key_version,\n            m.created_at, m.edited_at, m.deleted\n        FROM messages m\n        JOIN service_users u ON u.id = m.sender_id\n        WHERE m.gc_id = $1\n        AND EXISTS (\n            SELECT 1 FROM group_chat_members\n            WHERE gc_id = $1 AND user_id = $2\n        )\n        ORDER BY m.created_at DESC\n        LIMIT 50 OFFSET ($3 * 50)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "sender_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sender_username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "ciphertext",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "key_version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "edited_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "deleted",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "5f534434959fc7ec60a9b3be22d67f2fe8341aa3fd6024407cc787b39a3c7a66"
+}

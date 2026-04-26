@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO group_key_versions (id, gc_id, version, created_at)\n        VALUES (gen_random_uuid(), $1, 1, now())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1131ff11522ca537fd734f488b8f8cdf6f68bc9f196c3fb335080ca1b6ff6cf9"
+}

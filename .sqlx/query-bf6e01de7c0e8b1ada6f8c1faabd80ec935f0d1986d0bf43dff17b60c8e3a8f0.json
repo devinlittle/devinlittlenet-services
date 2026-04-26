@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO group_chats (id, name, owner_id, created_at)\n        VALUES (gen_random_uuid(), $1, $2, now())\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bf6e01de7c0e8b1ada6f8c1faabd80ec935f0d1986d0bf43dff17b60c8e3a8f0"
+}

@@ -5,7 +5,7 @@ use axum::{
 };
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -173,8 +173,8 @@ pub async fn revoke_all_from_id(
 }
 
 pub async fn _force_password_reset(
-    State(pool): State<PgPool>,
-    Extension(user): Extension<AuthenticatedUser>,
+    State(_pool): State<PgPool>,
+    Extension(_user): Extension<AuthenticatedUser>,
 ) -> () {
 }
 

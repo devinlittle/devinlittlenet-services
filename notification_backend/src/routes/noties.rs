@@ -14,7 +14,7 @@ use tokio::{select, sync::broadcast};
 use uuid::Uuid;
 
 use crate::{
-    routes::AppState,
+    routes::{AppState, ConnectedUsers},
     utils::{jwt::jwt_parse, secrets::SECRETS},
 };
 
@@ -92,6 +92,9 @@ pub async fn notify(
                 .online_users
                 .insert(uuid, Arc::new(RwLock::new(new_set)));
         }
+
+        // TODO: set active to true on auth_db thru internal call
+        // announce to all users with conversations that user is now active
 
         if !state.connected_users.contains_key(&uuid) {
             let (tx, _) = broadcast::channel::<String>(32);
@@ -198,6 +201,8 @@ pub async fn notify(
         };
 
         if is_empty {
+            // TODO: add current timestamp as last_active timestamp and active as false
+            // announce to all users that account now inactive sending timestamp
             state.online_users.remove(&uuid);
             state.connected_users.remove(&uuid);
             tracing::debug!("No sessions remaining for {}, removing entry", uuid);
@@ -258,5 +263,53 @@ pub async fn user_message(
     match tx.send(message) {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+async fn announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_offline(
+    user: Uuid,
+    announce_to: Vec<Uuid>,
+    channels: &ConnectedUsers,
+) -> () {
+    for id in announce_to {
+        let Some(tx) = channels.get(&id) else {return};
+
+        let message = serde_json::json!({
+            "namespace": "smalltalk",
+            "payload": {
+                "type": "UserOffline",
+                "user_id": user
+            }
+        })
+        .to_string();
+
+        match tx.send(message) {
+            Ok(_) => (),
+            Err(_) => return,
+        }
+    }
+}
+
+async fn announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_online(
+    user: Uuid,
+    announce_to: Vec<Uuid>,
+    channels: &ConnectedUsers,
+) -> () {
+    for id in announce_to {
+        let Some(tx) = channels.get(&id) else {return};
+
+        let message = serde_json::json!({
+            "namespace": "smalltalk",
+            "payload": {
+                "type": "UserOnline",
+                "user_id": user
+            }
+        })
+        .to_string();
+
+        match tx.send(message) {
+            Ok(_) => (),
+            Err(_) => return,
+        }
     }
 }

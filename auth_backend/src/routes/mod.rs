@@ -10,9 +10,10 @@ use utoipa::{
 };
 use utoipa_swagger_ui::SwaggerUi;
 
-pub mod admin;
-pub mod auth;
-pub mod internal;
+mod admin;
+mod auth;
+mod internal;
+mod user;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -22,11 +23,15 @@ pub mod internal;
         crate::routes::auth::login_handler,
         crate::routes::auth::logout_handler,
         crate::routes::auth::refresh_handler,
-        crate::routes::auth::delete_handler,
         crate::routes::auth::health,
-        crate::routes::auth::list_active_sessions,
-        crate::routes::auth::revoke_specific_session,
-        crate::routes::auth::revoke_all_sessions,
+        // User Routes
+        crate::routes::user::add_publickey,
+        crate::routes::user::delete_handler,
+        crate::routes::user::list_active_sessions,
+        crate::routes::user::revoke_specific_session,
+        crate::routes::user::revoke_all_sessions,
+        crate::routes::user::add_recovery_info,
+        crate::routes::user::verify_recovery_info,
         // Admin Paths
         crate::routes::admin::list_users,
         crate::routes::admin::change_role,
@@ -39,6 +44,10 @@ pub mod internal;
         schemas(
             crate::routes::auth::RegisterInput,
             crate::routes::auth::LoginInput,
+            crate::routes::user::UpdateProfileInput,
+            crate::routes::user::AddRecoveryInfoInputs,
+            crate::routes::user::VerifyRecoveryInfoInputs,
+            crate::routes::user::VerifyRecoveryInfoOutputs,
             crate::middleware::jwt::AuthenticatedUser,
             crate::middleware::jwt::Claims,
         )
@@ -107,13 +116,18 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/health", get(auth::health));
 
     let routes_with_middleware = Router::new()
-        .route("/delete", delete(auth::delete_handler))
-        .route("/sessions/list_all", get(auth::list_active_sessions))
+        // User Routes
         .route(
-            "/sessions/revoke/{id}",
-            delete(auth::revoke_specific_session),
+            "/me",
+            patch(user::add_publickey).delete(user::delete_handler),
         )
-        .route("/sessions/revoke", delete(auth::revoke_all_sessions))
+        .route(
+            "/me/sessions",
+            get(user::list_active_sessions).delete(user::revoke_all_sessions),
+        )
+        .route("/me/session/{id}", delete(user::revoke_specific_session))
+        .route("/me/recovery", patch(user::add_recovery_info))
+        .route("/me/recovery/verify", post(user::verify_recovery_info))
         //Admin Routes
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}/role", patch(admin::change_role))

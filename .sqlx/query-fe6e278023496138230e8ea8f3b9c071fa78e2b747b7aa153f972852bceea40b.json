@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users SET\n            bio = COALESCE($1, bio),\n            public_key = COALESCE($2, public_key),\n            last_seen_visible = COALESCE($3, last_seen_visible)\n        WHERE id = $4\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe6e278023496138230e8ea8f3b9c071fa78e2b747b7aa153f972852bceea40b"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, password_hash, username, roles FROM users WHERE username = $1",
+  "query": "SELECT id, password_hash, username, roles, public_key FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -22,19 +22,25 @@
         "ordinal": 3,
         "name": "roles",
         "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "public_key",
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "fa3f5e05cef79dfaebd6f2c8fcb94e53dc564b87ea497cbb8a1f322788a71815"
+  "hash": "d8cc6a7b1ebbc7085035759e5425a83888a224c34523f0fe1fa0d5c60cae0cbf"
 }

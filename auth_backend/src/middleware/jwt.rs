@@ -22,6 +22,7 @@ pub struct Claims {
     pub sub: String,
     pub username: String,
     pub roles: serde_json::Value,
+    pub public_key: Option<String>,
     #[serde(with = "jwt_numeric_date")]
     pub iat: OffsetDateTime,
     #[serde(with = "jwt_numeric_date")]
