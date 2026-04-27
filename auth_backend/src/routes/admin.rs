@@ -265,7 +265,7 @@ pub async fn delete_by_id(
             let _ = client
                 .delete(format!(
                     "http://gradegetter_backend:3002/internal/delete/{}",
-                    user.uuid
+                    target_id
                 ))
                 .header(
                     "Authorization",
@@ -274,6 +274,21 @@ pub async fn delete_by_id(
                 .send()
                 .await
                 .map_err(|err| tracing::error!("failed to delete user from gradegetter: {}", err));
+
+            let _ = client
+                .get(format!(
+                    "http://gradegetter_backend:3002/internal/invalidate/{}",
+                    target_id
+                ))
+                .header(
+                    "Authorization",
+                    format!("Basic {}", internal_api_key.as_str()),
+                )
+                .send()
+                .await
+                .map_err(|err| {
+                    tracing::error!("failed to invalidate user from gradegetter: {}", err);
+                });
 
             tracing::info!("deleted user: {}", user.username);
             Ok((axum::http::StatusCode::OK).into_response())
