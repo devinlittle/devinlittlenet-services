@@ -222,7 +222,22 @@ pub async fn evict_from_hashset(
             tracing::error!("failed to delete user from gradegetter: {}", err);
         });
 
-    tracing::info!("deleted user: {}", user.username);
+    /*    let _ = client
+        .get(format!(
+            "http://smalltalk_backend:3005/internal/invalidate/{}",
+            target_id
+        ))
+        .header(
+            "Authorization",
+            format!("Basic {}", internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!("failed to delete user from gradegetter: {}", err);
+        }); *//
+
+    tracing::info!("deleted user: {}", user.username); 
     Ok((axum::http::StatusCode::OK).into_response())
 }
 
@@ -249,7 +264,7 @@ pub async fn delete_by_id(
     Path(target_id): Path<Uuid>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+    if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
     }
 

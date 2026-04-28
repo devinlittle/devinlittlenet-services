@@ -1,31 +1,21 @@
 use anyhow::Result;
 use axum::{
     extract::{Path, State},
-    http::{HeaderValue, StatusCode},
+    http::StatusCode,
     response::IntoResponse,
     Extension, Json,
 };
-use axum_extra::{
-    headers::{Cookie, UserAgent},
-    TypedHeader,
-};
+use axum_extra::{headers::Cookie, TypedHeader};
 use constant_time_eq::constant_time_eq;
-use hyper::{header::SET_COOKIE, HeaderMap};
-use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
-use sqlx::{types::uuid, FromRow, PgPool};
-use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{error, info};
+use sqlx::{types::uuid, PgPool};
+use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    middleware::jwt::{jwt_numeric_date, AuthenticatedUser, Claims},
-    util::{
-        hash::{hash, hash_password, verify_password},
-        random::generate_random_string,
-        secrets::SECRETS,
-    },
+    middleware::jwt::{jwt_numeric_date, AuthenticatedUser},
+    util::{hash::hash, secrets::SECRETS},
 };
 
 #[derive(Deserialize, ToSchema)]
