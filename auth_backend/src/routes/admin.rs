@@ -223,21 +223,21 @@ pub async fn evict_from_hashset(
         });
 
     /*    let _ = client
-        .get(format!(
-            "http://smalltalk_backend:3005/internal/invalidate/{}",
-            target_id
-        ))
-        .header(
-            "Authorization",
-            format!("Basic {}", internal_api_key.as_str()),
-        )
-        .send()
-        .await
-        .map_err(|err| {
-            tracing::error!("failed to delete user from gradegetter: {}", err);
-        }); *//
+    .get(format!(
+        "http://smalltalk_backend:3005/internal/invalidate/{}",
+        target_id
+    ))
+    .header(
+        "Authorization",
+        format!("Basic {}", internal_api_key.as_str()),
+    )
+    .send()
+    .await
+    .map_err(|err| {
+        tracing::error!("failed to delete user from gradegetter: {}", err);
+    }); */
 
-    tracing::info!("deleted user: {}", user.username); 
+    tracing::info!("deleted user: {}", user.username);
     Ok((axum::http::StatusCode::OK).into_response())
 }
 
