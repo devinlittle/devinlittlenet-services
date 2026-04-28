@@ -10,7 +10,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 use tokio::sync::broadcast;
-use utoipa::OpenApi;
+use utoipa::{
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+    OpenApi,
+};
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
 
@@ -24,6 +27,9 @@ mod noties;
       paths(
         crate::routes::health,
         crate::routes::noties::notify,
+        crate::routes::noties::user_message,
+        crate::routes::internal::user_message,
+        crate::routes::internal::global_message,
     ),
     components(
         schemas(
@@ -31,7 +37,7 @@ mod noties;
             crate::utils::jwt::Claims,
         )
     ),
-    modifiers(&JwtBearer),
+    modifiers(&JwtBearer, &InternalAuth),
     tags(
         (name = "ws", description = "The websocket")
     )
@@ -39,6 +45,7 @@ mod noties;
 pub struct DaApiDoc;
 
 struct JwtBearer;
+struct InternalAuth;
 
 impl utoipa::Modify for JwtBearer {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
@@ -55,13 +62,24 @@ impl utoipa::Modify for JwtBearer {
     }
 }
 
+impl utoipa::Modify for InternalAuth {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "internal_auth",
+                SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Basic).build()),
+            );
+        }
+    }
+}
+
 #[utoipa::path(
-get,
-path = "/health",
-responses(
-    (status = 200, description = "returns 200 if service alive", body = String),
-),
-tag = "internal"
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "returns 200 if service alive", body = String),
+    ),
+    tag = "internal"
 )]
 async fn health() -> StatusCode {
     StatusCode::OK
