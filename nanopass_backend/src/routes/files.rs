@@ -35,6 +35,7 @@ pub async fn create_listing(
     let file_listing = FileListing {
         id: Uuid::new_v4(),
         owner_id: user.uuid,
+        owner_username: user.username,
         session_id: req.session_id,
         filename: req.filename,
         size_bytes: req.size_bytes,

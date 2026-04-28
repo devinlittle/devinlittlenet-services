@@ -17,6 +17,7 @@ pub enum Visibility {
 pub struct FileListing {
     pub id: Uuid,
     pub owner_id: Uuid,
+    pub owner_username: String,
     pub session_id: Uuid,
     pub filename: String,
     pub size_bytes: u64,
