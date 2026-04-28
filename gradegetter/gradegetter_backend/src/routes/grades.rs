@@ -25,7 +25,7 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Value>, StatusCode> {
-    if user.role != "devin" && user.role != "trusted" {
+    if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
     }
 
