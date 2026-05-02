@@ -36,3 +36,5 @@ pub async fn get_user_roles(
         .roles;
     Ok(Json(roles))
 }
+
+// add route to update active to true

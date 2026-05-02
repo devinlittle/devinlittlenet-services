@@ -1,11 +1,12 @@
 use anyhow::Result;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Extension, Json,
 };
 use axum_extra::{headers::Cookie, TypedHeader};
+use chrono::{DateTime, Utc};
 use constant_time_eq::constant_time_eq;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::uuid, PgPool};
@@ -378,4 +379,67 @@ pub async fn verify_recovery_info(
         encrypted_private_key,
     })
     .into_response())
+}
+
+#[derive(Serialize, sqlx::FromRow, ToSchema, Debug)]
+pub struct UserSearchResult {
+    pub id: Uuid,
+    pub username: String,
+    pub bio: Option<String>,
+    pub public_key: Option<String>,
+    //    pub last_seen: Option<DateTime<Utc>>,
+    //    pub last_seen_visible: bool,
+}
+
+#[derive(Deserialize)]
+pub struct SearchParams {
+    pub q: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/users/search?q=",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "show user search result", body = Vec<UserSearchResult>),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 403, description = "the hashes do not match"),
+        (status = 404, description = "the hashes do not exist"),
+    ),
+    tag = "user_auth"
+)]
+pub async fn search_user(
+    State(pool): State<PgPool>,
+    Extension(user): Extension<AuthenticatedUser>,
+    Query(search_query): Query<SearchParams>,
+) -> Result<Json<Vec<UserSearchResult>>, StatusCode> {
+    if search_query.q.len() < 2 {
+        return Ok(Json(vec![]));
+    }
+
+    let query = format!("%{}%", search_query.q.trim());
+
+    tracing::debug!("{}", query);
+
+    let results = sqlx::query_as!(
+        UserSearchResult,
+        r#"
+        SELECT id, username, bio, public_key
+        FROM users
+        WHERE username ILIKE $1
+        AND id != $2
+        LIMIT 20
+        "#,
+        query,
+        user.uuid
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    tracing::debug!("{:?}", results);
+
+    Ok(Json(results))
 }

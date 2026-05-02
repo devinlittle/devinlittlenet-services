@@ -5,6 +5,9 @@ recordings/
 /recordings/
 build.sh
 dev_build.sh
+/docker-hoopla/
+init-db.sh
+**/*.mp4
 
 # OS Specific
 .DS_STORE

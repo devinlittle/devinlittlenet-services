@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{middleware::jwt::AuthenticatedUser, util::secrets::SECRETS};
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct Users {
     id: Uuid,
     username: String,
@@ -26,7 +26,7 @@ pub struct Users {
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "hello admin!!!! hello little stylus, its devinlittle or owen kesterson inside the ADMINNNNNNN", body = String),
+        (status = 200, description = "hello admin!!!! hello little stylus, its devinlittle or owen kesterson inside the ADMINNNNNNN", body = Vec<Users>),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here STUPID"),
         (status = 500, description = "Interal Server Error")
@@ -85,7 +85,7 @@ pub struct ChangeRoleInput {
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "hello admin!!!! role changed 👀👀👀👀", body = String),
+        (status = 200, description = "hello admin!!!! role changed 👀👀👀👀"),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
         (status = 500, description = "Interal Server Error")
@@ -130,7 +130,7 @@ pub async fn change_role(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 200, description = "goodbye user, hello admin"),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
         (status = 500, description = "Interal Server Error")
@@ -188,7 +188,7 @@ pub async fn _force_password_reset(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 200, description = "goodbye user, hello admin"),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
         (status = 500, description = "Interal Server Error")
@@ -251,7 +251,7 @@ pub async fn evict_from_hashset(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 200, description = "goodbye user, hello admin"),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
         (status = 404, description = "user not found"),
@@ -329,7 +329,7 @@ pub struct MessageFromFrontend {
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "goodbye user, hello admin", body = String),
+        (status = 200, description = "goodbye user, hello admin"),
         (status = 401, description = "token error i think"),
         (status = 403, description = "you arent supposed to be here IDIIOIOOOOT"),
         (status = 404, description = "user not found"),
