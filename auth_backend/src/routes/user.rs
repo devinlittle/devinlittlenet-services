@@ -6,7 +6,6 @@ use axum::{
     Extension, Json,
 };
 use axum_extra::{headers::Cookie, TypedHeader};
-use chrono::{DateTime, Utc};
 use constant_time_eq::constant_time_eq;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

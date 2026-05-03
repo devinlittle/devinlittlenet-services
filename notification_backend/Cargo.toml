@@ -33,6 +33,7 @@ sqlx = { workspace = true, features = [
 uuid.workspace = true
 time.workspace = true
 jsonwebtoken.workspace = true
+web-push.workspace = true
 crypto_utils.workspace = true
 base64.workspace = true
 dashmap.workspace = true

@@ -1,5 +1,6 @@
 use axum::Router;
 use hyper::header::{ACCESS_CONTROL_ALLOW_ORIGIN, AUTHORIZATION, CONTENT_TYPE};
+use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, time::Duration};
 use tokio::signal::{
     self,
@@ -8,6 +9,8 @@ use tokio::signal::{
 use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+
+use crate::utils::secrets::SECRETS;
 
 mod middleware;
 mod routes;
@@ -55,7 +58,16 @@ async fn main() {
         ])
         .allow_credentials(true);
 
-    let app = Router::new().merge(routes::create_routes().layer(cors));
+    let database_string = &SECRETS.database_url;
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(3))
+        .connect(database_string)
+        .await
+        .expect("can't connect to database");
+
+    let app = Router::new().merge(routes::create_routes(pool.clone()).layer(cors));
 
     let host_on = "0.0.0.0:3003";
 

@@ -1,4 +1,11 @@
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+use std::sync::Arc;
+
+use axum::{
+    extract::{Request, State},
+    http::StatusCode,
+    middleware::Next,
+    response::Response,
+};
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
@@ -8,9 +15,10 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 
-use crate::utils::secrets::SECRETS;
+use crate::{routes::AppState, utils::secrets::SECRETS};
 
 #[derive(Clone, ToSchema)]
+#[allow(dead_code)]
 pub struct AuthenticatedUser {
     pub username: String,
     pub uuid: uuid::Uuid,
@@ -29,6 +37,7 @@ pub struct Claims {
 }
 
 pub async fn jwt_auth(
+    State(state): State<AppState>,
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     mut request: Request,
     next: Next,
@@ -64,6 +73,45 @@ pub async fn jwt_auth(
         .and_then(|v| v.as_str())
         .unwrap_or("user")
         .to_string();
+
+    let seen_users = Arc::clone(&state.seen_users);
+
+    let is_seen = {
+        let read = seen_users
+            .read()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        read.contains(&uuid)
+    };
+
+    if !is_seen {
+        // insert new uuid to db if not in already
+        if sqlx::query!("SELECT id FROM service_users WHERE id = $1", uuid)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|err| {
+                tracing::error!("{}", err);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+            .is_none()
+        {
+            sqlx::query!(
+                "INSERT INTO service_users (id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                uuid,
+                username
+            )
+            .execute(&state.pool)
+            .await
+            .map_err(|err| {
+                tracing::error!("{}", err);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        }
+
+        let mut write = seen_users
+            .write()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        write.insert(uuid);
+    }
 
     request.extensions_mut().insert(AuthenticatedUser {
         username,

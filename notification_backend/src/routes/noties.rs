@@ -7,13 +7,20 @@ use std::{
 use axum::{
     extract::{ws::Message, Path, State, WebSocketUpgrade},
     response::IntoResponse,
+    Extension, Json,
 };
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use tokio::{select, sync::broadcast};
+use utoipa::ToSchema;
 use uuid::Uuid;
+use web_push::{
+    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, WebPushClient, WebPushMessageBuilder,
+};
 
 use crate::{
+    middleware::jwt::AuthenticatedUser,
     routes::{AppState, ConnectedUsers},
     utils::{jwt::jwt_parse, secrets::SECRETS},
 };
@@ -54,7 +61,8 @@ pub async fn notify(
 
         let Ok(bootstrap_json) = serde_json::from_str::<Bootstrap>(bootstrap_json) else { return; };
 
-        let user = match jwt_parse(&bootstrap_json.token).await {
+        let user = match jwt_parse(axum::extract::State(state.clone()), &bootstrap_json.token).await
+        {
             Ok(user) => user,
             Err(_) => return,
         };
@@ -260,13 +268,140 @@ pub async fn user_message(
 
     let Some(tx) = state.connected_users.get(&uuid) else {return StatusCode::INTERNAL_SERVER_ERROR};
 
-    match tx.send(message) {
+    match tx.send(message.clone()) {
         Ok(_) => StatusCode::OK,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Err(_) => {
+            if notify_user(
+                &state.pool,
+                &state.web_push_client,
+                uuid,
+                "a", // TODO: changfe this to be the real title
+                message.as_str(),
+            )
+            .await
+            .is_ok()
+            {
+                StatusCode::OK
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        }
     }
 }
 
-async fn announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_offline(
+#[derive(Deserialize, ToSchema)]
+pub struct SubscribeRequest {
+    pub endpoint: String,
+    pub keys: SubscriptionKeys,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SubscriptionKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/subscribe",
+    request_body = SubscribeRequest,
+    security(
+        ("bearer_auth" = []),
+    ),
+    responses(
+        (status = 201, description = "endpoint and keys added to db for user", body = String),
+        (status = 500, description = "some server error or whatever", body = String),
+    )
+)]
+
+pub async fn push_api_subscribe(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+    Json(req): Json<SubscribeRequest>,
+) -> Result<impl IntoResponse, StatusCode> {
+    sqlx::query!(
+        r#"
+        INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (endpoint) DO UPDATE
+            SET p256dh = EXCLUDED.p256dh,
+                auth   = EXCLUDED.auth,
+                user_id = EXCLUDED.user_id
+        "#,
+        user.uuid,
+        req.endpoint,
+        req.keys.p256dh,
+        req.keys.auth,
+    )
+    .execute(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok((StatusCode::CREATED).into_response())
+}
+
+pub struct PushSubscription {
+    pub endpoint: String,
+    pub p256dh: String,
+    pub auth: String,
+}
+
+pub async fn get_user_subscriptions(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<PushSubscription>, sqlx::Error> {
+    sqlx::query_as!(
+        PushSubscription,
+        "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
+        user_id
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn notify_user(
+    pool: &PgPool,
+    client: &IsahcWebPushClient,
+    user_id: Uuid,
+    title: &str,
+    body: &str,
+) -> anyhow::Result<()> {
+    let subs = get_user_subscriptions(pool, user_id).await?;
+
+    let payload = serde_json::json!({ "title": title, "body": body }).to_string();
+
+    for sub in subs {
+        let info = SubscriptionInfo::new(&sub.endpoint, &sub.p256dh, &sub.auth);
+
+        let sig = SECRETS
+            .vapid_private_key
+            .clone()
+            .add_sub_info(&info)
+            .build()?;
+
+        let mut builder = WebPushMessageBuilder::new(&info);
+        builder.set_payload(ContentEncoding::Aes128Gcm, payload.as_bytes());
+        builder.set_vapid_signature(sig);
+
+        match client.send(builder.build()?).await {
+            Ok(_) => {}
+            Err(web_push::WebPushError::EndpointNotValid(_))
+            | Err(web_push::WebPushError::EndpointNotFound(_)) => {
+                sqlx::query!(
+                    "DELETE FROM push_subscriptions WHERE endpoint = $1",
+                    sub.endpoint
+                )
+                .execute(pool)
+                .await?;
+            }
+            Err(e) => tracing::warn!("Push failed for {}: {}", sub.endpoint, e),
+        }
+    }
+
+    Ok(())
+}
+
+async fn _announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_offline(
     user: Uuid,
     announce_to: Vec<Uuid>,
     channels: &ConnectedUsers,
@@ -290,7 +425,7 @@ async fn announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_offline(
     }
 }
 
-async fn announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_online(
+async fn _announce_that_the_user_about_to_be_mentioned_is_now_gonna_be_online(
     user: Uuid,
     announce_to: Vec<Uuid>,
     channels: &ConnectedUsers,
