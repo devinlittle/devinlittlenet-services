@@ -8,6 +8,7 @@ use axum::{
 use axum_extra::{headers::Cookie, TypedHeader};
 use chrono::{DateTime, Utc};
 use constant_time_eq::constant_time_eq;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::uuid, PgPool};
 use time::OffsetDateTime;
@@ -85,8 +86,6 @@ pub async fn delete_handler(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let internal_api_key = &SECRETS.internal_api_key;
-
     match sqlx::query!("DELETE FROM users WHERE id = $1", user.uuid)
         .execute(&pool)
         .await
@@ -94,33 +93,19 @@ pub async fn delete_handler(
         Ok(result) if result.rows_affected() > 0 => {
             let client = reqwest::Client::new();
 
-            let _ = client
-                .delete(format!(
-                    "http://gradegetter_backend:3002/internal/delete/{}",
-                    user.uuid
-                ))
-                .header(
-                    "Authorization",
-                    format!("Basic {}", internal_api_key.as_str()),
-                )
-                .send()
-                .await
-                .map_err(|err| tracing::error!("failed to delete user from gradegetter: {}", err));
+            delete_and_invalidate(
+                "http://gradegetter_backend:3002/internal".to_string(),
+                &client,
+                &user,
+            )
+            .await;
 
-            let _ = client
-                .get(format!(
-                    "http://gradegetter_backend:3002/internal/invalidate/{}",
-                    user.uuid
-                ))
-                .header(
-                    "Authorization",
-                    format!("Basic {}", internal_api_key.as_str()),
-                )
-                .send()
-                .await
-                .map_err(|err| {
-                    tracing::error!("failed to invalidate user from gradegetter: {}", err);
-                });
+            delete_and_invalidate(
+                "http://notification_backend:3003/internal".to_string(),
+                &client,
+                &user,
+            )
+            .await;
 
             tracing::info!("deleted user: {}", user.username);
             Ok((axum::http::StatusCode::OK).into_response())
@@ -131,6 +116,40 @@ pub async fn delete_handler(
             Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+pub async fn delete_and_invalidate(url: String, client: &Client, user: &AuthenticatedUser) {
+    let _ = client
+        .delete(format!("{}/delete/{}", url, user.uuid))
+        .header(
+            "Authorization",
+            format!("Basic {}", SECRETS.internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!(
+                "failed to delete user from service with url {}: {}",
+                url,
+                err
+            )
+        });
+
+    let _ = client
+        .get(format!("{}/invalidate/{}", url, user.uuid))
+        .header(
+            "Authorization",
+            format!("Basic {}", SECRETS.internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!(
+                "failed to invalidate user from service with url {}: {}",
+                url,
+                err
+            );
+        });
 }
 
 #[derive(Serialize, ToSchema)]

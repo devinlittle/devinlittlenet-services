@@ -10,7 +10,9 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{middleware::jwt::AuthenticatedUser, util::secrets::SECRETS};
+use crate::{
+    middleware::jwt::AuthenticatedUser, routes::user::delete_and_invalidate, util::secrets::SECRETS,
+};
 
 #[derive(Serialize, ToSchema)]
 pub struct Users {
@@ -222,20 +224,20 @@ pub async fn evict_from_hashset(
             tracing::error!("failed to delete user from gradegetter: {}", err);
         });
 
-    /*    let _ = client
-    .get(format!(
-        "http://smalltalk_backend:3005/internal/invalidate/{}",
-        target_id
-    ))
-    .header(
-        "Authorization",
-        format!("Basic {}", internal_api_key.as_str()),
-    )
-    .send()
-    .await
-    .map_err(|err| {
-        tracing::error!("failed to delete user from gradegetter: {}", err);
-    }); */
+    let _ = client
+        .get(format!(
+            "http://notification_backend:3003/internal/invalidate/{}",
+            target_id
+        ))
+        .header(
+            "Authorization",
+            format!("Basic {}", internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            tracing::error!("failed to delete user from notifications: {}", err);
+        });
 
     tracing::info!("deleted user: {}", user.username);
     Ok((axum::http::StatusCode::OK).into_response())
@@ -268,8 +270,6 @@ pub async fn delete_by_id(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let internal_api_key = &SECRETS.internal_api_key;
-
     match sqlx::query!("DELETE FROM users WHERE id = $1", target_id)
         .execute(&pool)
         .await
@@ -277,33 +277,19 @@ pub async fn delete_by_id(
         Ok(result) if result.rows_affected() > 0 => {
             let client = reqwest::Client::new();
 
-            let _ = client
-                .delete(format!(
-                    "http://gradegetter_backend:3002/internal/delete/{}",
-                    target_id
-                ))
-                .header(
-                    "Authorization",
-                    format!("Basic {}", internal_api_key.as_str()),
-                )
-                .send()
-                .await
-                .map_err(|err| tracing::error!("failed to delete user from gradegetter: {}", err));
+            delete_and_invalidate(
+                "http://gradegetter_backend:3002/internal".to_string(),
+                &client,
+                &user,
+            )
+            .await;
 
-            let _ = client
-                .get(format!(
-                    "http://gradegetter_backend:3002/internal/invalidate/{}",
-                    target_id
-                ))
-                .header(
-                    "Authorization",
-                    format!("Basic {}", internal_api_key.as_str()),
-                )
-                .send()
-                .await
-                .map_err(|err| {
-                    tracing::error!("failed to invalidate user from gradegetter: {}", err);
-                });
+            delete_and_invalidate(
+                "http://notification_backend:3003/internal".to_string(),
+                &client,
+                &user,
+            )
+            .await;
 
             tracing::info!("deleted user: {}", user.username);
             Ok((axum::http::StatusCode::OK).into_response())
