@@ -7,7 +7,6 @@ pub struct Secrets {
     pub jwt_secret: String,
     pub internal_api_key: String,
     pub vapid_private_key: PartialVapidSignatureBuilder,
-    pub vapid_public_key: String,
 }
 
 pub static SECRETS: LazyLock<Secrets> = LazyLock::new(|| {
@@ -23,7 +22,5 @@ pub static SECRETS: LazyLock<Secrets> = LazyLock::new(|| {
                 .as_str(),
         )
         .expect("MISSING DA VAPID PRIVATE KEY ENV VAR"),
-        vapid_public_key: dotenvy::var("VAPID_PUBLIC_KEY")
-            .expect("MISSING DA VAPID PUBLIC KEYENV VAR"),
     }
 });

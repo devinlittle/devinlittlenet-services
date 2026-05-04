@@ -272,15 +272,9 @@ pub async fn user_message(
     match tx.send(message.clone()) {
         Ok(_) => StatusCode::OK,
         Err(_) => {
-            if notify_user(
-                &state.pool,
-                &state.web_push_client,
-                uuid,
-                "a", // TODO: changfe this to be the real title
-                message.as_str(),
-            )
-            .await
-            .is_ok()
+            if notify_user(&state.pool, &state.web_push_client, uuid, message)
+                .await
+                .is_ok()
             {
                 StatusCode::OK
             } else {
@@ -301,18 +295,13 @@ async fn push_to_browser(
 
     match data.get("namespace").and_then(|n| n.as_str()) {
         Some("notification") => {
-            let title = data["payload"]["title"].as_str().unwrap_or("");
+            /*let title = data["payload"]["title"].as_str().unwrap_or("");
             let content = data["payload"]["content"].as_str().unwrap_or("");
+            let sender_username = data["payload"]["sender_username"].as_str().unwrap_or(""); */
 
-            if notify_user(
-                &pool,
-                &web_push_client,
-                user_id,
-                title, // TODO: changfe this to be the real title
-                content,
-            )
-            .await
-            .is_ok()
+            if notify_user(&pool, &web_push_client, user_id, message)
+                .await
+                .is_ok()
             {
                 StatusCode::OK
             } else {
@@ -398,12 +387,11 @@ pub async fn notify_user(
     pool: &PgPool,
     client: &IsahcWebPushClient,
     user_id: Uuid,
-    title: &str,
-    body: &str,
+    message: String,
 ) -> anyhow::Result<()> {
     let subs = get_user_subscriptions(pool, user_id).await?;
 
-    let payload = serde_json::json!({ "title": title, "body": body }).to_string();
+    let payload = message;
 
     for sub in subs {
         let info = SubscriptionInfo::new(&sub.endpoint, &sub.p256dh, &sub.auth);
