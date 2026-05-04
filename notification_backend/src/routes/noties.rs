@@ -11,6 +11,7 @@ use axum::{
 };
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::PgPool;
 use tokio::{select, sync::broadcast};
 use utoipa::ToSchema;
@@ -91,11 +92,11 @@ pub async fn notify(
         if let Some(hashset) = state.online_users.get(&uuid) {
             let mut write = hashset.write().unwrap();
             write.insert(session_id);
-            tracing::debug!("Added session to existing user entry: {:?}", *write);
+            tracing::debug!("Added session to existing active_user entry: {:?}", *write);
         } else {
             let mut new_set = HashSet::new();
             new_set.insert(session_id);
-            tracing::debug!("Created new user entry: {:?}", new_set);
+            tracing::debug!("Created new active_user entry: {:?}", new_set);
             state
                 .online_users
                 .insert(uuid, Arc::new(RwLock::new(new_set)));
@@ -192,7 +193,7 @@ pub async fn notify(
         });
 
         // session clean up logic
-        tracing::debug!("SESSION LOGIC ABOUT TO RUN");
+        tracing::debug!("SESSION REMOVAL LOGIC ABOUT TO RUN");
         let is_empty = if let Some(hashset_ref) = state.online_users.get(&uuid) {
             let mut write = match hashset_ref.write() {
                 Ok(guard) => guard,
@@ -266,7 +267,7 @@ pub async fn user_message(
         Err(_) => return StatusCode::UNAUTHORIZED,
     };
 
-    let Some(tx) = state.connected_users.get(&uuid) else {return StatusCode::INTERNAL_SERVER_ERROR};
+    let Some(tx) = state.connected_users.get(&uuid) else { return push_to_browser(state.pool, state.web_push_client, uuid, message).await };
 
     match tx.send(message.clone()) {
         Ok(_) => StatusCode::OK,
@@ -283,9 +284,43 @@ pub async fn user_message(
             {
                 StatusCode::OK
             } else {
+                tracing::error!("there was an error sending to a usr");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         }
+    }
+}
+
+async fn push_to_browser(
+    pool: PgPool,
+    web_push_client: IsahcWebPushClient,
+    user_id: Uuid,
+    message: String,
+) -> StatusCode {
+    let data: Value = serde_json::from_str(&message).unwrap_or_default();
+
+    match data.get("namespace").and_then(|n| n.as_str()) {
+        Some("notification") => {
+            let title = data["payload"]["title"].as_str().unwrap_or("");
+            let content = data["payload"]["content"].as_str().unwrap_or("");
+
+            if notify_user(
+                &pool,
+                &web_push_client,
+                user_id,
+                title, // TODO: changfe this to be the real title
+                content,
+            )
+            .await
+            .is_ok()
+            {
+                StatusCode::OK
+            } else {
+                tracing::error!("there was an error sending to a usr");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        }
+        _ => StatusCode::NOT_FOUND, // message is not notification-type message
     }
 }
 
