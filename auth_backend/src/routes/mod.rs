@@ -33,6 +33,7 @@ mod user;
         crate::routes::user::add_recovery_info,
         crate::routes::user::verify_recovery_info,
         crate::routes::user::search_user,
+        crate::routes::user::get_users_by_ids,
         // Admin Paths
         crate::routes::admin::list_users,
         crate::routes::admin::change_role,
@@ -50,6 +51,7 @@ mod user;
             crate::routes::user::VerifyRecoveryInfoInputs,
             crate::routes::user::VerifyRecoveryInfoOutputs,
             crate::routes::user::UserSearchResult,
+            crate::routes::user::ByIdsInput,
             crate::middleware::jwt::AuthenticatedUser,
             crate::middleware::jwt::Claims,
         )
@@ -131,6 +133,7 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/me/recovery", patch(user::add_recovery_info))
         .route("/me/recovery/verify", post(user::verify_recovery_info))
         .route("/users/search", get(user::search_user))
+        .route("/users/by-ids", post(user::get_users_by_ids))
         //Admin Routes
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{id}/role", patch(admin::change_role))

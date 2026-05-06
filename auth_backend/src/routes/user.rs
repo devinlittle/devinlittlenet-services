@@ -461,3 +461,43 @@ pub async fn search_user(
 
     Ok(Json(results))
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct ByIdsInput {
+    pub ids: Vec<Uuid>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/users/by-id",
+    request_body = ByIdsInput,
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "shows userinfo with provided ids", body = Vec<UserSearchResult>),
+        (status = 401, description = "Credentials Incorrect"),
+        (status = 403, description = "the hashes do not match"),
+        (status = 404, description = "the hashes do not exist"),
+    ),
+    tag = "user_auth"
+)]
+pub async fn get_users_by_ids(
+    State(pool): State<PgPool>,
+    Json(req): Json<ByIdsInput>,
+) -> Result<Json<Vec<UserSearchResult>>, StatusCode> {
+    let users = sqlx::query_as!(
+        UserSearchResult,
+        r#"
+        SELECT id, username, bio, public_key
+        FROM users
+        WHERE id = ANY($1)
+        "#,
+        &req.ids as &[Uuid]
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(users))
+}
