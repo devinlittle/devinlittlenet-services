@@ -24,6 +24,7 @@ mod internal;
     paths(
         crate::routes::health,
         crate::routes::files::create_listing,
+        crate::routes::files::modify_listing,
         crate::routes::files::remove_listing,
         crate::routes::files::get_listings,
         crate::routes::files::remove_all_session_listings,
@@ -104,7 +105,8 @@ pub fn create_routes() -> Router {
             "/listings",
             post(files::create_listing)
                 .delete(files::remove_listing)
-                .get(files::get_listings),
+                .get(files::get_listings)
+                .patch(files::modify_listing),
         )
         .route(
             "/listings/session",

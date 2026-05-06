@@ -57,6 +57,37 @@ pub async fn create_listing(
     }
 }
 
+#[utoipa::path(
+    patch,
+    path = "/listings",
+    request_body = FileListing,
+    security(
+        ("bearer_auth" = []),
+    ),
+    responses(
+        (status = 200, description = "listing modified", body = String),
+        (status = 500, description = "uhmmm...failed", body = String),
+    ),
+    tag = "file_listings"
+)]
+pub async fn modify_listing(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+    Json(req): Json<FileListing>,
+) -> StatusCode {
+    match state.files.get(&req.id) {
+        Some(listing) if listing.owner_id == user.uuid => {
+            let owned = req.clone();
+            drop(listing);
+            state.files.alter(&owned.id, |_, _| req);
+            notify_listing_modified(&owned, &state.client, &SECRETS.internal_api_key).await;
+            StatusCode::OK
+        }
+        Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
+        None => StatusCode::NOT_FOUND,
+    }
+}
+
 #[derive(Deserialize, ToSchema)]
 pub struct RemoveListingInput {
     pub listing_id: Uuid,
@@ -191,6 +222,33 @@ async fn notify_listing_added(
             "http://notification_backend:3003/internal/global_message".to_string()
         }
     };
+
+    let _ = client
+        .post(url)
+        .header("Authorization", format!("Basic {}", internal_api_key))
+        .json(&message)
+        .send()
+        .await
+        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
+}
+
+async fn notify_listing_modified(
+    listing: &FileListing,
+    client: &reqwest::Client,
+    internal_api_key: &str,
+) {
+    let message = serde_json::json!({
+        "namespace": "nanopass",
+        "id": Uuid::new_v4(),
+        "from_session_id": listing.session_id,
+        "target_session_id": null,
+        "payload": {
+            "type": "ListingModified",
+            "listing": listing
+        }
+    });
+
+    let url = "http://notification_backend:3003/internal/global_message".to_string();
 
     let _ = client
         .post(url)
