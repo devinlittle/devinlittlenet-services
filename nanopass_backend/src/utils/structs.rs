@@ -25,6 +25,7 @@ pub struct FileListing {
     #[serde(with = "jwt_numeric_date")]
     pub created_at: OffsetDateTime,
     pub visibility: Visibility,
+    pub auto_accept: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -37,6 +38,7 @@ pub struct FileListingInput {
     #[serde(with = "jwt_numeric_date")]
     pub created_at: OffsetDateTime,
     pub visibility: Visibility,
+    pub auto_accept: bool,
 }
 
 /* struct NanoPassMessage {

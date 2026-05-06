@@ -42,6 +42,7 @@ pub async fn create_listing(
         mime_type: req.mime_type,
         created_at: OffsetDateTime::now_utc(),
         visibility: req.visibility,
+        auto_accept: req.auto_accept,
     };
 
     if state

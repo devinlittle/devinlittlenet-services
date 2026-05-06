@@ -30,6 +30,7 @@ async fn main() {
         "http://127.0.0.1:5173".parse().unwrap(),
         "https://127.0.0.1:5173".parse().unwrap(),
         "http://10.10.10.10:5173".parse().unwrap(),
+        "https://10.10.10.10:5173".parse().unwrap(),
         "https://localhost:5173".parse().unwrap(),
         "https://devinlittle.net".parse().unwrap(),
         "https://api.devinlittle.net".parse().unwrap(),
