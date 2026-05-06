@@ -146,7 +146,9 @@ pub async fn get_listings(
         .filter(|l| match &l.visibility {
             Visibility::Private => l.owner_id == user.uuid,
             Visibility::Public => true,
-            Visibility::Restricted { allowlist } => allowlist.contains(&user.uuid),
+            Visibility::Restricted { allowlist } => {
+                allowlist.contains(&user.uuid) || l.owner_id == user.uuid
+            }
         })
         .map(|l| l.value().clone())
         .collect();
