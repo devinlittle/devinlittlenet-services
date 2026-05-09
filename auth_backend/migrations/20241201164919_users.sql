@@ -7,7 +7,7 @@ CREATE TABLE users (
     public_key TEXT,
     recovery_hash TEXT,
     encrypted_private_key TEXT,
-    active BOOL DEFAULT false,
+    active BOOL DEFAULT false, -- TODO: might remove this and just have "last_seen" == NULL to indicate an active user
     last_seen TIMESTAMPTZ,
     last_seen_visible BOOL DEFAULT true
 );

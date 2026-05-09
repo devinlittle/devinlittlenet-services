@@ -25,9 +25,9 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Value>, StatusCode> {
-    if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
+    /* if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
-    }
+    } */
 
     let grades_row = sqlx::query!("SELECT grades FROM grades WHERE id = $1", user.uuid)
         .fetch_optional(&state.pool)

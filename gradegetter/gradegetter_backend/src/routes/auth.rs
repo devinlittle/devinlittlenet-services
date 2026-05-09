@@ -40,11 +40,6 @@ pub async fn add_schoology_credentials_handler(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<SchoologyLogin>,
 ) -> Result<StatusCode, StatusCode> {
-    info!(
-        "Encrypted Schoology Credentials added to user: {:?}",
-        user.username
-    );
-
     sqlx::query!(
         "INSERT INTO schoology_auth (id, encrypted_email, encrypted_password) VALUES ($1, $2, $3)
          ON CONFLICT (id) DO UPDATE SET 
@@ -63,6 +58,11 @@ pub async fn add_schoology_credentials_handler(
         );
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    info!(
+        "Encrypted Schoology Credentials added to user: {:?}",
+        user.username
+    );
 
     Ok(StatusCode::NO_CONTENT)
 }
