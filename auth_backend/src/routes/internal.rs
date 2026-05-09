@@ -2,8 +2,8 @@ use axum::{
     extract::{Path, State},
     Json,
 };
+use common::UserRoles;
 use hyper::StatusCode;
-use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -25,16 +25,24 @@ use uuid::Uuid;
 pub async fn get_user_roles(
     State(pool): State<PgPool>,
     Path(uuid): Path<Uuid>,
-) -> Result<Json<Value>, StatusCode> {
-    let roles = sqlx::query!("SELECT roles FROM users WHERE id = $1", uuid)
+) -> Result<Json<UserRoles>, StatusCode> {
+    let row = sqlx::query!("SELECT roles FROM users WHERE id = $1", uuid)
         .fetch_one(&pool)
         .await
-        .map_err(|err| {
-            tracing::error!("{}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?
-        .roles;
+        .map_err(|err| match err {
+            sqlx::Error::RowNotFound => StatusCode::NOT_FOUND,
+            _ => {
+                tracing::error!("Database error fetching roles: {}", err);
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+
+    let roles: UserRoles = serde_json::from_value(row.roles).map_err(|e| {
+        tracing::error!("Failed to deserialize UserRoles for {}: {}", uuid, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     Ok(Json(roles))
 }
 
-// add route to update active to true
+// TODO: add route to update active to true

@@ -4,6 +4,8 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+common = { workspace = true, features = ["auth"] }
+
 tokio.workspace = true
 axum.workspace = true
 axum-extra = {workspace = true, features = ["typed-header"]}
@@ -30,11 +32,11 @@ sqlx = { workspace = true, features = [
   "migrate",
   "json",
   "time",
+  "chrono",
   "uuid"]}
 uuid.workspace = true
 time.workspace = true
 jsonwebtoken.workspace = true
-crypto_utils.workspace = true
 chrono = {workspace = true, features = ["serde"]}
 base64.workspace = true
 rand.workspace = true
@@ -51,7 +53,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 
 [package.metadata.deb]
 maintainer = "Devin Little <devinlittlee@gmail.com>"
-copyright = "2025, Devin Little <devinlittlee@gmail.com>"
+copyright = "2026, Devin Little <devinlittlee@gmail.com>"
 #license-file = ["LICENSE", "4"]
 extended-description = """\
 bruh i cant anyomre its my backend service thats it."""

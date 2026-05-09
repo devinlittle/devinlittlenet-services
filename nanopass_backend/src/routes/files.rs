@@ -1,17 +1,14 @@
 use axum::{extract::State, response::IntoResponse, Extension, Json};
 use hyper::StatusCode;
-use serde::Deserialize;
-use time::OffsetDateTime;
-use utoipa::ToSchema;
+use sqlx::types::chrono::Utc;
 use uuid::Uuid;
 
-use crate::{
-    middleware::jwt::AuthenticatedUser,
-    routes::AppState,
-    utils::{
-        secrets::SECRETS,
-        structs::{FileListing, FileListingInput, Visibility},
-    },
+use crate::{routes::AppState, utils::secrets::SECRETS};
+
+use common::{
+    nanopass::{FileListing, FileListingInput, RemoveListingInput, RemoveSessionInput, Visibility},
+    notification::RoleMessage,
+    AuthenticatedUser, UserRole,
 };
 
 #[utoipa::path(
@@ -35,12 +32,12 @@ pub async fn create_listing(
     let file_listing = FileListing {
         id: Uuid::new_v4(),
         owner_id: user.uuid,
-        owner_username: user.username,
+        owner_username: user.username.clone(),
         session_id: req.session_id,
         filename: req.filename,
         size_bytes: req.size_bytes,
         mime_type: req.mime_type,
-        created_at: OffsetDateTime::now_utc(),
+        created_at: Utc::now(),
         visibility: req.visibility,
         auto_accept: req.auto_accept,
     };
@@ -51,6 +48,7 @@ pub async fn create_listing(
         .is_none()
     {
         notify_listing_added(&file_listing, &state.client, &SECRETS.internal_api_key).await;
+        tracing::info!("{} added a new listing", &user.username);
         Json(file_listing).into_response()
     } else {
         StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -81,16 +79,12 @@ pub async fn modify_listing(
             drop(listing);
             state.files.alter(&owned.id, |_, _| req);
             notify_listing_modified(&owned, &state.client, &SECRETS.internal_api_key).await;
+            tracing::info!("{} motified a listing", &user.username);
             StatusCode::OK
         }
         Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
         None => StatusCode::NOT_FOUND,
     }
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct RemoveListingInput {
-    pub listing_id: Uuid,
 }
 
 #[utoipa::path(
@@ -117,6 +111,7 @@ pub async fn remove_listing(
             drop(listing);
             state.files.remove(&req.listing_id);
             notify_listing_removed(&owned, &state.client, &SECRETS.internal_api_key).await;
+            tracing::info!("{} removed a listing", &user.username);
             StatusCode::OK
         }
         Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
@@ -155,11 +150,6 @@ pub async fn get_listings(
     Json(listings)
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct RemoveSessionInput {
-    pub session_id: Uuid,
-}
-
 #[utoipa::path(
     delete,
     path = "/listings/session",
@@ -193,6 +183,7 @@ pub async fn remove_all_session_listings(
         notify_listing_removed(listing, &state.client, &SECRETS.internal_api_key).await;
     }
 
+    tracing::info!("{} removed their listings", &user.username);
     StatusCode::OK
 }
 
@@ -232,6 +223,26 @@ async fn notify_listing_added(
         .send()
         .await
         .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
+
+    let role_message_payload = serde_json::json!({
+        "namespace": "nanopass",
+        "payload": {
+            "type": "ListingAdded",
+        }
+    });
+
+    let role_message = RoleMessage {
+        target_role: UserRole::Devin,
+        message: role_message_payload.to_string(),
+    };
+
+    let _ = client
+        .post("https://notification_backend:3003/internal/role_message".to_string())
+        .header("Authorization", format!("Basic {}", internal_api_key))
+        .json(&role_message)
+        .send()
+        .await
+        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
 }
 
 async fn notify_listing_modified(
@@ -258,7 +269,7 @@ async fn notify_listing_modified(
         .json(&message)
         .send()
         .await
-        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
+        .map_err(|err| tracing::error!("failed to notify listing motified: {}", err));
 }
 
 pub async fn notify_listing_removed(
@@ -294,6 +305,26 @@ pub async fn notify_listing_removed(
         .post(url)
         .header("Authorization", format!("Basic {}", internal_api_key))
         .json(&message)
+        .send()
+        .await
+        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
+
+    let role_message_payload = serde_json::json!({
+        "namespace": "nanopass",
+        "payload": {
+            "type": "ListingRemoved",
+        }
+    });
+
+    let role_message = RoleMessage {
+        target_role: UserRole::Devin,
+        message: role_message_payload.to_string(),
+    };
+
+    let _ = client
+        .post("https://notification_backend:3003/internal/role_message".to_string())
+        .header("Authorization", format!("Basic {}", internal_api_key))
+        .json(&role_message)
         .send()
         .await
         .map_err(|err| tracing::error!("failed to notify listing added: {}", err));

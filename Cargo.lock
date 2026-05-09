@@ -198,8 +198,8 @@ dependencies = [
  "axum-server",
  "base64 0.22.1",
  "chrono",
+ "common",
  "constant_time_eq 0.5.0",
- "crypto_utils",
  "dotenvy",
  "hyper",
  "hyper-tls",
@@ -581,6 +581,18 @@ dependencies = [
  "libc",
  "wasix",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "strum",
+ "utoipa",
+ "uuid",
 ]
 
 [[package]]
@@ -1415,6 +1427,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum",
+ "common",
  "crypto_utils",
  "dotenvy",
  "futures-util",
@@ -1442,6 +1455,7 @@ dependencies = [
  "axum-prometheus",
  "axum-server",
  "base64 0.22.1",
+ "common",
  "constant_time_eq 0.5.0",
  "crypto_utils",
  "dashmap",
@@ -2334,6 +2348,7 @@ dependencies = [
  "axum-prometheus",
  "axum-server",
  "base64 0.22.1",
+ "common",
  "constant_time_eq 0.5.0",
  "crypto_utils",
  "dashmap",
@@ -2393,6 +2408,7 @@ dependencies = [
  "axum-prometheus",
  "axum-server",
  "base64 0.22.1",
+ "common",
  "constant_time_eq 0.5.0",
  "crypto_utils",
  "dashmap",
@@ -3628,6 +3644,7 @@ checksum = "ee6798b1838b6a0f69c007c133b8df5866302197e404e8b6ee8ed3e3a5e68dc6"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "crc",
  "crossbeam-queue",
  "either",
@@ -3707,6 +3724,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "bytes",
+ "chrono",
  "crc",
  "digest 0.10.7",
  "dotenvy",
@@ -3750,6 +3768,7 @@ dependencies = [
  "base64 0.22.1",
  "bitflags",
  "byteorder",
+ "chrono",
  "crc",
  "dotenvy",
  "etcetera",
@@ -3786,6 +3805,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2d12fe70b2c1b4401038055f90f151b78208de1f9f89a7dbfd41587a10c3eea"
 dependencies = [
  "atoi",
+ "chrono",
  "flume",
  "futures-channel",
  "futures-core",
@@ -3844,6 +3864,27 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
  "unicode-properties",
+]
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]

@@ -5,22 +5,18 @@ use axum::{
 };
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{
-    middleware::jwt::AuthenticatedUser, routes::user::delete_and_invalidate, util::secrets::SECRETS,
+use crate::{routes::user::delete_and_invalidate, util::secrets::SECRETS};
+
+use common::{
+    auth::{
+        ChangeRoleInput, Message, MessageNamespace, NotificationPayload, NotificationType, Users,
+    },
+    AuthenticatedUser, UserRole,
 };
-
-#[derive(Serialize, ToSchema)]
-pub struct Users {
-    id: Uuid,
-    username: String,
-    roles: Value,
-}
-
 #[utoipa::path(
     get,
     path = "/admin/users",
@@ -38,8 +34,8 @@ pub struct Users {
 pub async fn list_users(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
-) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+) -> Result<Json<Vec<Users>>, StatusCode> {
+    if !user.role.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -47,33 +43,23 @@ pub async fn list_users(
         .fetch_all(&pool)
         .await
         .map_err(|err| {
-            tracing::error!("admin fetch all users req failed{}", err);
+            tracing::error!("admin fetch all users req failed: {}", err);
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let users: Vec<Users> = users
-        .iter()
-        .map(|users| Users {
-            id: users.id,
-            username: users.username.clone(),
-            roles: users.roles.clone(),
+        })?
+        .into_iter()
+        .map(|row| {
+            Ok(Users {
+                id: row.id,
+                username: row.username,
+                roles: serde_json::from_value(row.roles).map_err(|e| {
+                    tracing::error!("error here bubby: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<Users>, StatusCode>>()?;
 
-    let output = serde_json::to_value(users).map_err(|err| {
-        tracing::error!("failed to seriliaze sessions_hashset: {}", err);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    Ok((Json(output)).into_response())
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct ChangeRoleInput {
-    #[schema(example = "gradegetter")]
-    service: String,
-    #[schema(example = "devin")]
-    role: String,
+    Ok(Json(users))
 }
 
 #[utoipa::path(
@@ -100,15 +86,17 @@ pub async fn change_role(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<ChangeRoleInput>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+    if !user.role.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
+
+    let path = &[req.service.to_string()];
 
     sqlx::query!(
         "UPDATE users
      SET roles = jsonb_set(roles, $1, $2::jsonb)
      WHERE id = $3",
-        &[req.service],
+        path as &[String],
         serde_json::json!(req.role),
         target_id
     )
@@ -143,8 +131,8 @@ pub async fn revoke_all_from_id(
     State(pool): State<PgPool>,
     Path(target_id): Path<Uuid>,
     Extension(user): Extension<AuthenticatedUser>,
-) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+) -> Result<String, StatusCode> {
+    if !user.role.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -159,7 +147,7 @@ pub async fn revoke_all_from_id(
     {
         Ok(result) => {
             if result.rows_affected() > 0 {
-                Ok("sessions GONE".into_response())
+                Ok("sessions GONE".to_string())
             } else {
                 Err(StatusCode::NOT_MODIFIED)
             }
@@ -174,6 +162,7 @@ pub async fn revoke_all_from_id(
     }
 }
 
+// TODO: make this a thing
 pub async fn _force_password_reset(
     State(_pool): State<PgPool>,
     Extension(_user): Extension<AuthenticatedUser>,
@@ -201,7 +190,7 @@ pub async fn evict_from_hashset(
     Path(target_id): Path<Uuid>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" {
+    if !user.role.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -239,7 +228,7 @@ pub async fn evict_from_hashset(
             tracing::error!("failed to delete user from notifications: {}", err);
         });
 
-    tracing::info!("deleted user: {}", user.username);
+    tracing::info!("invalidated user `{}`  from all hashsets", user.username);
     Ok((axum::http::StatusCode::OK).into_response())
 }
 
@@ -266,7 +255,7 @@ pub async fn delete_by_id(
     Path(target_id): Path<Uuid>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
+    if !user.role.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -328,7 +317,7 @@ pub async fn global_message(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<MessageFromFrontend>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
+    if user.role == UserRole::User {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -361,31 +350,4 @@ pub async fn global_message(
         .map_err(|err| tracing::error!("failed to send message: {}", err));
 
     Ok((axum::http::StatusCode::OK).into_response())
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct Message {
-    pub namespace: MessageNamespace,
-    pub payload: serde_json::Value,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum MessageNamespace {
-    Notification,
-    Nanopass,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct NotificationPayload {
-    pub r#type: NotificationType,
-    pub title: String,
-    pub content: String,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum NotificationType {
-    Global,
-    User,
 }

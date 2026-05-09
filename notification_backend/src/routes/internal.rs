@@ -3,7 +3,9 @@ use std::str::FromStr;
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
+    Json,
 };
+use common::notification::RoleMessage;
 use hyper::StatusCode;
 use uuid::Uuid;
 
@@ -74,8 +76,9 @@ pub async fn delete_handler(
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/internal/global_message",
+    request_body = String,
     security(
         ("internal_auth" = []),
     ),
@@ -87,6 +90,35 @@ pub async fn delete_handler(
 )]
 pub async fn global_message(State(state): State<AppState>, message: String) -> StatusCode {
     match state.global_channel.send(message) {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/internal/role_message",
+    request_body = RoleMessage,
+    security(
+        ("internal_auth" = []),
+    ),
+    responses(
+        (status = 200, description = "message sent to admin and broadcasted", body = String),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "internal"
+)]
+pub async fn role_message(
+    State(state): State<AppState>,
+    Json(req): Json<RoleMessage>,
+) -> StatusCode {
+    let role_tx = if let Some(tx) = state.role_channel.get(&req.target_role) {
+        tx
+    } else {
+        return StatusCode::NOT_ACCEPTABLE;
+    };
+
+    match role_tx.send(req.message) {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }

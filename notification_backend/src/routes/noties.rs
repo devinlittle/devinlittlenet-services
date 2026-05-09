@@ -10,20 +10,23 @@ use axum::{
     Extension, Json,
 };
 use hyper::StatusCode;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
 use tokio::{select, sync::broadcast};
-use utoipa::ToSchema;
 use uuid::Uuid;
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, WebPushClient, WebPushMessageBuilder,
 };
 
 use crate::{
-    middleware::jwt::AuthenticatedUser,
     routes::{AppState, ConnectedUsers},
     utils::{jwt::jwt_parse, secrets::SECRETS},
+};
+
+use common::{
+    nanopass::RemoveSessionInternalInput,
+    notification::{Bootstrap, PushSubscription, SendNotification, SubscribeRequest},
+    AuthenticatedUser, UserRole,
 };
 
 #[utoipa::path(
@@ -86,6 +89,8 @@ pub async fn notify(
             return;
         }
 
+        let is_admin = user.role.is_admin();
+
         let session_id = bootstrap_json.session_id;
 
         // Populating online_users per user hashset!!
@@ -114,7 +119,27 @@ pub async fn notify(
             .await
             .ok();
 
+        let online_len = if let Some(read) = state.online_users.get(&user.uuid) {
+            let read = match read.read() {
+                Ok(read) => read,
+                Err(poisoned) => {
+                    tracing::error!("LOCK POISONED FOR USER {}", uuid);
+                    poisoned.into_inner()
+                }
+            };
+
+            read.len()
+        } else {
+            0
+        };
+
         // From this line forward, user is in connected_users and the endpoint is setup
+        tracing::info!(
+            "{} has connected with {} device(s) connected ",
+            user.username,
+            online_len
+        );
+
         let mut global_rx = state.global_channel.subscribe();
         let tx = if let Some(tx) = state.connected_users.get(&uuid) {
             tx.subscribe()
@@ -124,6 +149,19 @@ pub async fn notify(
             state.connected_users.get(&uuid).unwrap().subscribe()
         };
         let mut user_rx = tx;
+
+        let admin_tx = if let Some(tx) = state.role_channel.get(&UserRole::Devin) {
+            tx.subscribe()
+        } else {
+            let (tx, _) = broadcast::channel(32);
+            state.role_channel.insert(UserRole::Devin, tx.clone());
+            state
+                .role_channel
+                .get(&UserRole::Devin)
+                .unwrap()
+                .subscribe()
+        };
+        let mut admin_rx = admin_tx;
 
         loop {
             select! {
@@ -162,6 +200,16 @@ pub async fn notify(
                     }
                 },
                 msg = user_rx.recv() => {
+                    match msg {
+                        Ok(msg) => {
+                            if socket.send(Message::Text(msg.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                },
+                msg = admin_rx.recv(), if is_admin => {
                     match msg {
                         Ok(msg) => {
                             if socket.send(Message::Text(msg.into())).await.is_err() {
@@ -219,26 +267,28 @@ pub async fn notify(
             tracing::debug!("session_id: {} removed for {}", session_id, uuid);
         }
 
+        let online_len = if let Some(read) = state.online_users.get(&user.uuid) {
+            let read = match read.read() {
+                Ok(read) => read,
+                Err(poisoned) => {
+                    tracing::error!("LOCK POISONED FOR USER {}", uuid);
+                    poisoned.into_inner()
+                }
+            };
+
+            read.len()
+        } else {
+            0
+        };
+
+        tracing::info!(
+            "{} has disconnected now with {} device(s) connected ",
+            user.username,
+            online_len
+        );
+
         tracing::debug!("this is connected_users: {:?}", state.connected_users);
     })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Bootstrap {
-    token: String,
-    session_id: Uuid,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct SendNotification {
-    recipient: String,
-    content: String,
-}
-
-#[derive(Serialize)]
-pub struct RemoveSessionInternalInput {
-    pub user_id: Uuid,
-    pub session_id: Uuid,
 }
 
 #[utoipa::path(
@@ -313,18 +363,6 @@ async fn push_to_browser(
     }
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct SubscribeRequest {
-    pub endpoint: String,
-    pub keys: SubscriptionKeys,
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct SubscriptionKeys {
-    pub p256dh: String,
-    pub auth: String,
-}
-
 #[utoipa::path(
     post,
     path = "/subscribe",
@@ -362,12 +400,6 @@ pub async fn push_api_subscribe(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok((StatusCode::CREATED).into_response())
-}
-
-pub struct PushSubscription {
-    pub endpoint: String,
-    pub p256dh: String,
-    pub auth: String,
 }
 
 pub async fn get_user_subscriptions(

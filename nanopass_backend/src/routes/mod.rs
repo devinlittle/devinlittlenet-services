@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use axum_prometheus::PrometheusMetricLayerBuilder;
+use common::nanopass::FileListing;
 use dashmap::DashMap;
 use hyper::StatusCode;
 use std::sync::Arc;
@@ -11,10 +12,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
 
-use crate::{
-    middleware::{internal::basic_auth, jwt::jwt_auth},
-    utils::structs::FileListing,
-};
+use crate::middleware::{internal::basic_auth, jwt::jwt_auth};
 
 mod files;
 mod internal;
@@ -32,12 +30,10 @@ mod internal;
     ),
     components(
         schemas(
-            crate::middleware::jwt::AuthenticatedUser,
-            crate::middleware::jwt::Claims,
-            crate::routes::files::RemoveListingInput,
-            crate::routes::files::RemoveSessionInput,
-            crate::utils::structs::FileListingInput,
-            crate::routes::internal::RemoveSessionInternalInput,
+            common::nanopass::RemoveListingInput,
+            common::nanopass::RemoveSessionInput,
+            common::nanopass::RemoveSessionInternalInput,
+            common::nanopass::FileListingInput,
         )
     ),
     modifiers(&JwtBearer),

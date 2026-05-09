@@ -1,7 +1,14 @@
 [workspace]
 resolver = "3"
 members = [
-"auth_backend/", "notification_backend/", "gradegetter/gradegetter", "gradegetter/gradegetter_backend/", "gradegetter/crypto_utils/", "nanopass_backend/"]
+  "auth_backend/",
+  "notification_backend/",
+  "gradegetter/gradegetter",
+  "gradegetter/gradegetter_backend/",
+  "gradegetter/crypto_utils/",
+  "nanopass_backend/",
+  "common"
+]
 
 
 [workspace.dependencies]
@@ -14,7 +21,7 @@ hyper = {version = "1.9.0"}
 hyper-tls = "0.6.0"
 tower-http = { version = "0.6.8", features = ["cors"]}
 tower = "0.5.3"
-utoipa = {version = "5.4", features = ["axum_extras", "time", "uuid"]}
+utoipa = {version = "5.4", features = ["axum_extras", "uuid", "chrono"]}
 utoipa-swagger-ui = {version = "9.0", features = ["axum"]}
 rustls = { version = "0.23.37", features = ["ring"] }
 ring = "0.17.14"
@@ -24,7 +31,7 @@ futures-util = "0.3.32"
 serde = {version = "1", features = ["derive"]}
 serde_json = {version = "1"}
 sha2 = {version = "0.10"}
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 argon2 = "0.5"
 sqlx = {version = "0.8.6"}
 uuid = {version = "1.23", features = ["v4", "serde"]}
@@ -45,6 +52,8 @@ rand = "0.10"
 base64 = "0.22"
 once_cell = "1.21"
 crypto_utils = { path = "./gradegetter/crypto_utils" }
+common = { path = "./common" }
+strum = { version = "0.28", features = ["derive"] }
 #totp-rs = { version = "5.7.0", features = ["qr"]}  # used to be in here for something else.
 
 [profile.release]

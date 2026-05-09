@@ -5,21 +5,12 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
-use serde::Deserialize;
+use common::{gradegetter::SchoologyLogin, AuthenticatedUser};
 use tokio::sync::watch::{self};
 use tracing::{error, info};
-use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{middleware::jwt::AuthenticatedUser, routes::AppState};
-
-#[derive(Deserialize, ToSchema)]
-pub struct SchoologyLogin {
-    #[schema(example = "email@exmaple.com")]
-    schoology_email: String,
-    #[schema(example = "password")]
-    schoology_password: String,
-}
+use crate::routes::AppState;
 
 #[utoipa::path(
     post,

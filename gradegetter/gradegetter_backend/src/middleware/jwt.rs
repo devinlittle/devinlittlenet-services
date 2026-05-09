@@ -8,31 +8,11 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use common::{AuthenticatedUser, Claims, UserRoles};
 use jsonwebtoken::{DecodingKey, Validation};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use time::OffsetDateTime;
-use utoipa::ToSchema;
 
 use crate::{routes::AppState, utils::secrets::SECRETS};
-
-#[derive(Clone, ToSchema, Debug)]
-pub struct AuthenticatedUser {
-    pub username: String,
-    pub uuid: uuid::Uuid,
-    pub role: String,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, ToSchema)]
-pub struct Claims {
-    pub sub: String, // This is gonna be the uuid baka~
-    pub username: String,
-    pub roles: serde_json::Value,
-    #[serde(with = "jwt_numeric_date")]
-    pub iat: OffsetDateTime,
-    #[serde(with = "jwt_numeric_date")]
-    pub exp: OffsetDateTime,
-}
 
 pub async fn jwt_auth(
     State(state): State<AppState>,
@@ -67,11 +47,9 @@ pub async fn jwt_auth(
     let username = decoded_jwt.username;
     let role = decoded_jwt
         .roles
-        .get("gradegetter")
-        .or_else(|| decoded_jwt.roles.get("global"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("user")
-        .to_string();
+        .get(&common::ServiceName::Gradegetter)
+        .or_else(|| decoded_jwt.roles.get(&common::ServiceName::Global))
+        .unwrap_or(&common::UserRole::User);
 
     let seen_users = Arc::clone(&state.seen_users);
 
@@ -129,18 +107,19 @@ pub async fn jwt_auth(
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR
             })?;
 
-        let db_role: serde_json::Value = serde_json::from_str(&db_role)
+        let db_role: UserRoles = serde_json::from_str(&db_role)
             .map_err(|err| {
-                tracing::error!("i bet this is the issue... {}", err);
+                tracing::error!(
+                    "error decoding deserializing db_role, check middleware {}",
+                    err
+                );
             })
             .unwrap_or_default();
 
         let db_role = db_role
-            .get("gradegetter")
-            .or_else(|| db_role.get("global"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("user")
-            .to_string();
+            .get(&common::ServiceName::Gradegetter)
+            .or_else(|| db_role.get(&common::ServiceName::Global))
+            .unwrap_or(&common::UserRole::User);
 
         if db_role != role {
             // db role value is different then provided jwt;
@@ -157,32 +136,8 @@ pub async fn jwt_auth(
     request.extensions_mut().insert(AuthenticatedUser {
         username,
         uuid,
-        role,
+        role: role.clone(),
     });
 
     Ok(next.run(request).await)
-}
-
-pub mod jwt_numeric_date {
-    //! Custom serialization of OffsetDateTime to conform with the JWT spec (RFC 7519 section 2, "Numeric Date")
-    use serde::{self, Deserialize, Deserializer, Serializer};
-    use time::OffsetDateTime;
-
-    /// Serializes an OffsetDateTime to a Unix timestamp (milliseconds since 1970/1/1T00:00:00T)
-    pub fn serialize<S>(date: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let timestamp = date.unix_timestamp();
-        serializer.serialize_i64(timestamp)
-    }
-
-    /// Attempts to deserialize an i64 and use as a Unix timestamp
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<OffsetDateTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        OffsetDateTime::from_unix_timestamp(i64::deserialize(deserializer)?)
-            .map_err(|_| serde::de::Error::custom("invalid Unix timestamp value"))
-    }
 }

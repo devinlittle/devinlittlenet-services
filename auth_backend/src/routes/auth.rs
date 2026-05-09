@@ -1,39 +1,32 @@
 use anyhow::Result;
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::{HeaderValue, StatusCode},
     response::IntoResponse,
-    Extension, Json,
+    Json,
 };
 use axum_extra::{
     headers::{Cookie, UserAgent},
     TypedHeader,
 };
+use chrono::{DateTime, Duration, Utc};
 use hyper::{header::SET_COOKIE, HeaderMap};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use serde::{Deserialize, Serialize};
-use sqlx::{types::uuid, FromRow, PgPool};
+use sqlx::{types::uuid, PgPool};
 use time::{OffsetDateTime, PrimitiveDateTime};
-use tracing::{error, info};
-use utoipa::ToSchema;
+use tracing::info;
 use uuid::Uuid;
 
-use crate::{
-    middleware::jwt::{jwt_numeric_date, AuthenticatedUser, Claims},
-    util::{
-        hash::{hash, hash_password, verify_password},
-        random::generate_random_string,
-        secrets::SECRETS,
-    },
+use common::{
+    auth::{LoginInput, LoginOutput, RegisterInput},
+    Claims,
 };
 
-#[derive(Deserialize, ToSchema)]
-pub struct RegisterInput {
-    #[schema(example = "user")]
-    username: String,
-    #[schema(example = "password")]
-    password: String,
-}
+use crate::util::{
+    hash::{hash, hash_password, verify_password},
+    random::generate_random_string,
+    secrets::SECRETS,
+};
 
 #[utoipa::path(
     post,
@@ -60,26 +53,22 @@ pub async fn register_handler(
     Ok(Json("User registered".to_string()))
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct LoginInput {
-    #[schema(example = "user")]
-    username: String,
-    #[schema(example = "password")]
-    password: String,
+#[derive(sqlx::FromRow)]
+struct UserRow {
+    pub id: uuid::Uuid,
+    pub username: String,
+    pub password_hash: String,
+    pub roles: serde_json::Value,
+    pub public_key: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct ReturnDB {
-    id: uuid::Uuid,
-    username: String,
-    roles: serde_json::Value,
-    password_hash: String,
-    public_key: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LoginOutput {
-    access_token: String,
+impl UserRow {
+    pub fn try_into_roles(&self) -> Result<common::UserRoles, StatusCode> {
+        serde_json::from_value(self.roles.clone()).map_err(|e| {
+            tracing::error!("Role mapping failed: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+    }
 }
 
 #[utoipa::path(
@@ -99,7 +88,7 @@ pub async fn login_handler(
     Json(req): Json<LoginInput>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let row = sqlx::query_as!(
-        ReturnDB,
+        UserRow,
         "SELECT id, password_hash, username, roles, public_key FROM users WHERE username = $1",
         &req.username
     )
@@ -118,13 +107,13 @@ pub async fn login_handler(
     if verify_password(req.password.as_str(), &user.password_hash) {
         let sub = user.id.to_string();
         let username = req.username.to_string();
-        let iat = OffsetDateTime::now_utc();
-        let exp = iat + time::Duration::minutes(15);
+        let iat: DateTime<Utc> = Utc::now();
+        let exp = iat + Duration::minutes(15);
 
         let access_token = generate_jwt(Claims {
             sub,
             username,
-            roles: user.roles,
+            roles: user.try_into_roles()?,
             public_key: user.public_key,
             iat,
             exp,
@@ -154,54 +143,6 @@ pub async fn login_handler(
             user.username, user.id
         );
         Err(axum::http::StatusCode::UNAUTHORIZED)
-    }
-}
-
-#[utoipa::path(
-    post,
-    path = "/logout",
-    security(
-        ("cookie_auth" = [])
-    ),
-    responses(
-        (status = 200, description = "Sends back an empty, expired cookie to client ", body = String),
-        (status = 401, description = "the refresh_token cookie the user send is messed tf up"),
-        (status = 500, description = "Interal Server Error")
-    ),
-    tag = "user_auth"
-)]
-pub async fn logout_handler(
-    State(pool): State<PgPool>,
-    TypedHeader(cookies): TypedHeader<Cookie>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let refresh_cookie = cookies.get("refresh_token").unwrap_or_default();
-
-    let query = format!(
-        "DELETE FROM refresh_tokens WHERE token_hash = '{}'",
-        hash(refresh_cookie)
-    );
-
-    tracing::debug!("{query}");
-
-    if sqlx::query(&query)
-        .execute(&pool)
-        .await
-        .map_err(|err| {
-            tracing::error!("{}", err);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
-        .is_ok()
-    {
-        let refresh_cookie = "refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
-
-        let mut headers = HeaderMap::new();
-
-        headers.insert(SET_COOKIE, HeaderValue::from_str(refresh_cookie).unwrap());
-
-        info!(r#"User logged out sucessfully"#);
-        Ok((StatusCode::OK, headers).into_response())
-    } else {
-        Err(StatusCode::UNAUTHORIZED)
     }
 }
 
@@ -282,7 +223,8 @@ pub async fn refresh_handler(
         None => return Err(StatusCode::UNAUTHORIZED), // token invalid or already used
     };
 
-    let user = sqlx::query!(
+    let user = sqlx::query_as!(
+        UserRow,
         "SELECT id, password_hash, username, roles, public_key FROM users WHERE id = $1",
         uuid
     )
@@ -295,13 +237,13 @@ pub async fn refresh_handler(
 
     let sub = user.id.to_string();
     let username = user.username.clone();
-    let iat = OffsetDateTime::now_utc();
-    let exp = iat + time::Duration::minutes(15);
+    let iat: DateTime<Utc> = Utc::now();
+    let exp = iat + Duration::minutes(15);
 
     let access_token = generate_jwt(Claims {
         sub,
         username,
-        roles: user.roles,
+        roles: user.try_into_roles()?,
         public_key: user.public_key,
         iat,
         exp,
@@ -324,6 +266,54 @@ pub async fn refresh_handler(
 
     tracing::debug!("Refreshed ref_token for user: {}", user.username);
     Ok((headers, Json(LoginOutput { access_token })).into_response())
+}
+
+#[utoipa::path(
+    post,
+    path = "/logout",
+    security(
+        ("cookie_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "Sends back an empty, expired cookie to client ", body = String),
+        (status = 401, description = "the refresh_token cookie the user send is messed tf up"),
+        (status = 500, description = "Interal Server Error")
+    ),
+    tag = "user_auth"
+)]
+pub async fn logout_handler(
+    State(pool): State<PgPool>,
+    TypedHeader(cookies): TypedHeader<Cookie>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let refresh_cookie = cookies.get("refresh_token").unwrap_or_default();
+
+    let query = format!(
+        "DELETE FROM refresh_tokens WHERE token_hash = '{}'",
+        hash(refresh_cookie)
+    );
+
+    tracing::debug!("{query}");
+
+    if sqlx::query(&query)
+        .execute(&pool)
+        .await
+        .map_err(|err| {
+            tracing::error!("{}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+        .is_ok()
+    {
+        let refresh_cookie = "refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
+
+        let mut headers = HeaderMap::new();
+
+        headers.insert(SET_COOKIE, HeaderValue::from_str(refresh_cookie).unwrap());
+
+        info!(r#"User logged out sucessfully"#);
+        Ok((StatusCode::OK, headers).into_response())
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
+    }
 }
 
 pub fn generate_jwt(claims: Claims) -> Result<String, StatusCode> {

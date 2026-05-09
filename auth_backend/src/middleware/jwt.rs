@@ -3,31 +3,10 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
+use common::{AuthenticatedUser, Claims};
 use jsonwebtoken::{DecodingKey, Validation};
-use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
-use utoipa::ToSchema;
 
 use crate::util::secrets::SECRETS;
-
-#[derive(Clone, ToSchema)]
-pub struct AuthenticatedUser {
-    pub username: String,
-    pub uuid: uuid::Uuid,
-    pub role: String,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, ToSchema)]
-pub struct Claims {
-    pub sub: String,
-    pub username: String,
-    pub roles: serde_json::Value,
-    pub public_key: Option<String>,
-    #[serde(with = "jwt_numeric_date")]
-    pub iat: OffsetDateTime,
-    #[serde(with = "jwt_numeric_date")]
-    pub exp: OffsetDateTime,
-}
 
 pub async fn jwt_auth(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
@@ -61,10 +40,9 @@ pub async fn jwt_auth(
     let username = decoded_jwt.username;
     let role = decoded_jwt
         .roles
-        .get("global")
-        .and_then(|v| v.as_str())
-        .unwrap_or("user")
-        .to_string();
+        .get(&common::ServiceName::Global)
+        .unwrap_or(&common::UserRole::User)
+        .clone();
 
     request.extensions_mut().insert(AuthenticatedUser {
         username,
@@ -73,28 +51,4 @@ pub async fn jwt_auth(
     });
 
     Ok(next.run(request).await)
-}
-
-pub mod jwt_numeric_date {
-    //! Custom serialization of OffsetDateTime to conform with the JWT spec (RFC 7519 section 2, "Numeric Date")
-    use serde::{self, Deserialize, Deserializer, Serializer};
-    use time::OffsetDateTime;
-
-    /// Serializes an OffsetDateTime to a Unix timestamp (milliseconds since 1970/1/1T00:00:00T)
-    pub fn serialize<S>(date: &OffsetDateTime, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let timestamp = date.unix_timestamp();
-        serializer.serialize_i64(timestamp)
-    }
-
-    /// Attempts to deserialize an i64 and use as a Unix timestamp
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<OffsetDateTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        OffsetDateTime::from_unix_timestamp(i64::deserialize(deserializer)?)
-            .map_err(|_| serde::de::Error::custom("invalid Unix timestamp value"))
-    }
 }

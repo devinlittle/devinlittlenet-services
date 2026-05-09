@@ -4,7 +4,9 @@ use hyper::StatusCode;
 use serde_json::Value;
 use tracing::info;
 
-use crate::{middleware::jwt::AuthenticatedUser, routes::AppState};
+use crate::routes::AppState;
+
+use common::AuthenticatedUser;
 
 #[utoipa::path(
     get,
@@ -25,6 +27,7 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<Value>, StatusCode> {
+    // BUG: this commented code below me is bugged bc it uses the old string'd roles
     /* if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
         return Err(StatusCode::FORBIDDEN);
     } */

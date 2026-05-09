@@ -4,6 +4,8 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+common = { workspace = true, features = ["nanopass", "notifications"]}
+
 tokio.workspace = true
 axum = { workspace = true, features = ["ws", "macros"] }
 axum-extra = {workspace = true, features = ["typed-header"]}
@@ -28,7 +30,7 @@ sqlx = { workspace = true, features = [
   "postgres",
   "migrate",
   "json",
-  "time",
+  "chrono",
   "uuid"]}
 uuid.workspace = true
 time.workspace = true

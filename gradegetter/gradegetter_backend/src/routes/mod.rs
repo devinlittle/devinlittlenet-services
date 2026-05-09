@@ -36,8 +36,10 @@ pub mod internal;
     ),
     components(
         schemas(
-            crate::middleware::jwt::AuthenticatedUser,
-            crate::middleware::jwt::Claims,
+            common::AuthenticatedUser,
+            common::Claims,
+            common::gradegetter::SchoologyLogin,
+            common::gradegetter::ForwardMessage,
         )
     ),
     modifiers(&JwtBearer),

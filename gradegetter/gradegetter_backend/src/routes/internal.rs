@@ -3,11 +3,11 @@ use axum::{
     response::IntoResponse,
 };
 use hyper::StatusCode;
-use serde::Deserialize;
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::routes::AppState;
+
+use common::gradegetter::{ForwardMessage, ForwardStatus};
 
 #[utoipa::path(
     get,
@@ -73,12 +73,6 @@ pub async fn delete_handler(
     }
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct ForwardMessage {
-    id: Uuid,
-    status: String,
-}
-
 #[utoipa::path(
     get,
     path = "/internal/forward_ws",
@@ -97,10 +91,14 @@ pub async fn forward_status_ws(
         tracing::debug!("internal ws connected");
         while let Some(Ok(Message::Text(msg))) = socket.recv().await {
             tracing::debug!("internal ws received: {}", msg);
-            let payload: ForwardMessage = serde_json::from_str(msg.as_str()).unwrap(); //HACK: 1 unwrap here
+            let payload: ForwardMessage =
+                serde_json::from_str(msg.as_str()).unwrap_or_else(|_| ForwardMessage {
+                    id: uuid::Uuid::nil(),
+                    status: ForwardStatus::ErrorInSetup,
+                });
             if let Some(tx) = state.channels.get(&payload.id.to_string()) {
                 tracing::debug!("found channel for {}, sending", payload.id);
-                tx.send(payload.status)
+                tx.send(payload.status.to_string())
                     .map_err(|err| {
                         tracing::error!("{}", err);
                     })

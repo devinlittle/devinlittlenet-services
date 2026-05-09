@@ -1,19 +1,11 @@
 use axum::{extract::State, Json};
+use common::nanopass::{FileListing, RemoveSessionInternalInput};
 use hyper::StatusCode;
-use serde::Deserialize;
-use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::{
     routes::{files::notify_listing_removed, AppState},
-    utils::{secrets::SECRETS, structs::FileListing},
+    utils::secrets::SECRETS,
 };
-
-#[derive(Deserialize, ToSchema)]
-pub struct RemoveSessionInternalInput {
-    pub user_id: Uuid,
-    pub session_id: Uuid,
-}
 
 #[utoipa::path(
     delete,

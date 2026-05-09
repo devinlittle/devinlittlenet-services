@@ -3,6 +3,7 @@ use axum::{
     Router,
 };
 use axum_prometheus::PrometheusMetricLayerBuilder;
+use common::UserRole;
 use dashmap::DashMap;
 use hyper::StatusCode;
 use sqlx::PgPool;
@@ -33,14 +34,18 @@ mod noties;
         crate::routes::noties::push_api_subscribe,
         crate::routes::internal::user_message,
         crate::routes::internal::global_message,
+        crate::routes::internal::role_message,
         crate::routes::internal::invalidate_user,
         crate::routes::internal::delete_handler,
 
     ),
     components(
         schemas(
-            crate::utils::jwt::AuthenticatedUser,
-            crate::utils::jwt::Claims,
+            common::AuthenticatedUser,
+            common::Claims,
+            common::notification::RoleMessage,
+            common::notification::SubscribeRequest,
+            common::notification::SendNotification,
         )
     ),
     modifiers(&JwtBearer, &InternalAuth),
@@ -92,12 +97,14 @@ async fn health() -> StatusCode {
 }
 
 type ConnectedUsers = Arc<DashMap<Uuid, broadcast::Sender<String>>>;
+type RbacChannels = Arc<DashMap<UserRole, broadcast::Sender<String>>>;
 type OnlineUsers = Arc<DashMap<Uuid, Arc<RwLock<HashSet<Uuid>>>>>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub global_channel: Arc<broadcast::Sender<String>>,
     pub connected_users: ConnectedUsers,
+    pub role_channel: RbacChannels,
     pub online_users: OnlineUsers,
     pub seen_users: Arc<RwLock<HashSet<Uuid>>>,
     pub pool: PgPool,
@@ -109,6 +116,7 @@ pub fn create_routes(pool: PgPool) -> Router {
     let global_channel = Arc::new(global_tx);
 
     let connected_users = Arc::new(DashMap::new());
+    let role_channel = Arc::new(DashMap::new());
     let online_users: OnlineUsers = Arc::new(DashMap::new());
 
     let seen_users = Arc::new(RwLock::new(HashSet::new()));
@@ -118,6 +126,7 @@ pub fn create_routes(pool: PgPool) -> Router {
     let app_state = AppState {
         connected_users,
         global_channel,
+        role_channel,
         online_users,
         seen_users,
         pool,
@@ -149,6 +158,7 @@ pub fn create_routes(pool: PgPool) -> Router {
         )
         .route("/internal/delete/{uuid}", delete(internal::delete_handler))
         .route("/internal/global_message", post(internal::global_message))
+        .route("/internal/role_message", post(internal::role_message))
         .route(
             "/internal/user_message/{uuid}",
             post(internal::user_message),

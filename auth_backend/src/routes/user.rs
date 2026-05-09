@@ -6,25 +6,23 @@ use axum::{
     Extension, Json,
 };
 use axum_extra::{headers::Cookie, TypedHeader};
+use chrono::{DateTime, Utc};
 use constant_time_eq::constant_time_eq;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::uuid, PgPool};
-use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{
-    middleware::jwt::{jwt_numeric_date, AuthenticatedUser},
-    util::{hash::hash, secrets::SECRETS},
-};
+use crate::util::{hash::hash, secrets::SECRETS};
 
-#[derive(Deserialize, ToSchema)]
-pub struct UpdateProfileInput {
-    pub bio: Option<String>,
-    pub public_key: Option<String>,
-    pub last_seen_visible: Option<bool>,
-}
+use common::{
+    auth::{
+        ActiveSessions, AddRecoveryInfoInputs, ByIdsInput, UpdateProfileInput,
+        VerifyRecoveryInfoInputs, VerifyRecoveryInfoOutputs,
+    },
+    AuthenticatedUser,
+};
 
 #[utoipa::path(
     patch,
@@ -151,15 +149,6 @@ pub async fn delete_and_invalidate(url: String, client: &Client, user: &Authenti
         });
 }
 
-#[derive(Serialize, ToSchema)]
-pub struct ActiveSessions {
-    session_id: Uuid,
-    #[serde(with = "jwt_numeric_date")]
-    expires_at: OffsetDateTime,
-    user_agent: String,
-    is_current: bool,
-}
-
 #[utoipa::path(
     get,
     path = "/me/sessions",
@@ -193,11 +182,16 @@ pub async fn list_active_sessions(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    #[allow(clippy::redundant_closure)]
     let sessions: Vec<ActiveSessions> = sessions
         .iter()
         .map(|session| ActiveSessions {
             session_id: session.id,
-            expires_at: session.expires_at.assume_utc(),
+            expires_at: DateTime::from_timestamp(
+                session.expires_at.assume_utc().unix_timestamp(),
+                0,
+            )
+            .unwrap_or_else(|| Utc::now()),
             user_agent: session.user_agent.clone(),
             is_current: {
                 hash(cookies.get("refresh_token").unwrap_or_default()) == session.token_hash
@@ -301,12 +295,6 @@ pub async fn revoke_specific_session(
     }
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct AddRecoveryInfoInputs {
-    pub recovery_hash: String,
-    pub encrypted_private_key: String,
-}
-
 #[utoipa::path(
     patch,
     path = "/me/recovery",
@@ -342,16 +330,6 @@ pub async fn add_recovery_info(
         Ok(_) => Ok(StatusCode::OK),
         Err(_) => Err(StatusCode::CONFLICT),
     }
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct VerifyRecoveryInfoInputs {
-    pub recovery_hash: String,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct VerifyRecoveryInfoOutputs {
-    pub encrypted_private_key: String,
 }
 
 #[utoipa::path(
@@ -460,11 +438,6 @@ pub async fn search_user(
     tracing::debug!("{:?}", results);
 
     Ok(Json(results))
-}
-
-#[derive(Deserialize, ToSchema)]
-pub struct ByIdsInput {
-    pub ids: Vec<Uuid>,
 }
 
 #[utoipa::path(

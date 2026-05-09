@@ -4,6 +4,8 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+common = {workspace = true, features = ["gradegetter"]}
+
 reqwest = { workspace = true, features = ["json"]}
 tokio.workspace = true
 regex.workspace = true
