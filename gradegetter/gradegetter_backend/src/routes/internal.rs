@@ -98,7 +98,13 @@ pub async fn forward_status_ws(
                 });
             if let Some(tx) = state.channels.get(&payload.id.to_string()) {
                 tracing::debug!("found channel for {}, sending", payload.id);
-                tx.send(payload.status.to_string())
+
+                let status_str = serde_json::to_string(&payload.status)
+                    .unwrap_or_default()
+                    .trim_matches('"')
+                    .to_string();
+
+                tx.send(status_str)
                     .map_err(|err| {
                         tracing::error!("{}", err);
                     })

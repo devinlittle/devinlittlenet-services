@@ -237,7 +237,7 @@ async fn notify_listing_added(
     };
 
     let _ = client
-        .post("https://notification_backend:3003/internal/role_message".to_string())
+        .post("http://notification_backend:3003/internal/role_message".to_string())
         .header("Authorization", format!("Basic {}", internal_api_key))
         .json(&role_message)
         .send()
@@ -322,7 +322,7 @@ pub async fn notify_listing_removed(
     };
 
     let _ = client
-        .post("https://notification_backend:3003/internal/role_message".to_string())
+        .post("http://notification_backend:3003/internal/role_message".to_string())
         .header("Authorization", format!("Basic {}", internal_api_key))
         .json(&role_message)
         .send()

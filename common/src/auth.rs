@@ -83,6 +83,7 @@ pub struct UpdateProfileInput {
 #[derive(Serialize, ToSchema)]
 pub struct ActiveSessions {
     pub session_id: Uuid,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub expires_at: DateTime<Utc>,
     pub user_agent: String,
     pub is_current: bool,

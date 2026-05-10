@@ -40,6 +40,7 @@ pub struct FileListing {
     pub filename: String,
     pub size_bytes: u64,
     pub mime_type: String,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub created_at: DateTime<Utc>,
     pub visibility: Visibility,
     pub auto_accept: bool,
@@ -52,6 +53,7 @@ pub struct FileListingInput {
     pub filename: String,
     pub size_bytes: u64,
     pub mime_type: String,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub created_at: DateTime<Utc>,
     pub visibility: Visibility,
     pub auto_accept: bool,
