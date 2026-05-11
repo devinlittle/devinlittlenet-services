@@ -24,6 +24,21 @@ pub struct SubscriptionKeys {
     pub auth: String,
 }
 
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct NotificationMessage {
+    r#type: NotificationType,
+    title: String,
+    content: String,
+    sender_username: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum NotificationType {
+    Global,
+    User,
+}
+
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct Bootstrap {
     pub token: String,

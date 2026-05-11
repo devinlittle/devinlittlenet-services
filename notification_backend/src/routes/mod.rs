@@ -32,7 +32,7 @@ mod noties;
         crate::routes::noties::notify,
         crate::routes::noties::user_message,
         crate::routes::noties::push_api_subscribe,
-        crate::routes::internal::user_message,
+        crate::routes::internal::internal_user_message,
         crate::routes::internal::global_message,
         crate::routes::internal::role_message,
         crate::routes::internal::invalidate_user,
@@ -161,7 +161,7 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/internal/role_message", post(internal::role_message))
         .route(
             "/internal/user_message/{uuid}",
-            post(internal::user_message),
+            post(internal::internal_user_message),
         )
         .layer(axum::middleware::from_fn(
             crate::middleware::internal::basic_auth,

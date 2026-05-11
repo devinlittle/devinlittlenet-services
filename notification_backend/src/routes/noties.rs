@@ -25,7 +25,9 @@ use crate::{
 
 use common::{
     nanopass::RemoveSessionInternalInput,
-    notification::{Bootstrap, PushSubscription, SendNotification, SubscribeRequest},
+    notification::{
+        Bootstrap, NotificationMessage, PushSubscription, SendNotification, SubscribeRequest,
+    },
     AuthenticatedUser, UserRole,
 };
 
@@ -294,9 +296,9 @@ pub async fn notify(
 #[utoipa::path(
     post,
     path = "/user_message/{id}",
-    request_body = String,
+    request_body = NotificationMessage,
     params(
-        ("String", description = "contains a uuid")
+        ("id", description = "contains a uuid")
     ),
     security(
         ("bearer_auth" = []),
@@ -310,12 +312,20 @@ pub async fn notify(
 pub async fn user_message(
     State(state): State<AppState>,
     Path(uuid): Path<String>,
-    message: String,
+    Json(req): Json<NotificationMessage>,
 ) -> StatusCode {
     let uuid = match Uuid::from_str(uuid.as_str()) {
         Ok(uuid) => uuid,
         Err(_) => return StatusCode::UNAUTHORIZED,
     };
+
+    let message_payload = serde_json::to_string(&req).unwrap_or_default();
+
+    let message = serde_json::json!({
+        "namespace": "notification",
+        "payload": message_payload,
+    })
+    .to_string();
 
     let Some(tx) = state.connected_users.get(&uuid) else { return push_to_browser(state.pool, state.web_push_client, uuid, message).await };
 

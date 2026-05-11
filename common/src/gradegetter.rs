@@ -1,6 +1,6 @@
 // used in gradegetter_backend/routes/auth.rs
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
@@ -42,4 +42,4 @@ pub enum ForwardStatus {
     ErrorInSetup,
 }
 
-pub type GradesHashMap = HashMap<String, Vec<Option<f32>>>;
+pub type GradesHashMap = BTreeMap<String, Vec<Option<f32>>>;

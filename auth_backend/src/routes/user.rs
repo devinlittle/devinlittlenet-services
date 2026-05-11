@@ -393,8 +393,9 @@ pub struct SearchParams {
 }
 
 #[utoipa::path(
-    post,
-    path = "/users/search?q=",
+    get,
+    path = "/users/search",
+    params(("q", Query, description = "the user search query")),
     security(
         ("bearer_auth" = [])
     ),

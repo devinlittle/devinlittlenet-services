@@ -269,7 +269,7 @@ pub async fn refresh_handler(
 }
 
 #[utoipa::path(
-    post,
+    get,
     path = "/logout",
     security(
         ("cookie_auth" = [])

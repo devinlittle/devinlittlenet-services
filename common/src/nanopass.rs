@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_with::{formats::Strict, serde_as, TimestampSeconds};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -31,6 +32,7 @@ pub enum Visibility {
     Restricted { allowlist: Vec<Uuid> },
 }
 
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct FileListing {
     pub id: Uuid,
@@ -40,12 +42,13 @@ pub struct FileListing {
     pub filename: String,
     pub size_bytes: u64,
     pub mime_type: String,
-    #[serde(with = "chrono::serde::ts_seconds")]
+    #[serde_as(as = "TimestampSeconds<String, Strict>")]
     pub created_at: DateTime<Utc>,
     pub visibility: Visibility,
     pub auto_accept: bool,
 }
 
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct FileListingInput {
     pub owner_id: Uuid,
@@ -53,7 +56,7 @@ pub struct FileListingInput {
     pub filename: String,
     pub size_bytes: u64,
     pub mime_type: String,
-    #[serde(with = "chrono::serde::ts_seconds")]
+    #[serde_as(as = "TimestampSeconds<String, Strict>")]
     pub created_at: DateTime<Utc>,
     pub visibility: Visibility,
     pub auto_accept: bool,

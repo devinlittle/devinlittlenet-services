@@ -146,7 +146,7 @@ pub async fn role_message(
     ),
     tag = "internal"
 )]
-pub async fn user_message(
+pub async fn internal_user_message(
     State(state): State<AppState>,
     Path(uuid): Path<String>,
     message: String,

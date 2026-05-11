@@ -90,7 +90,7 @@ pub async fn change_role(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let path = &[req.service.to_string()];
+    let path = &[req.service.to_string().to_lowercase()];
 
     sqlx::query!(
         "UPDATE users

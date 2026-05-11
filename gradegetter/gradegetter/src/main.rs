@@ -10,7 +10,7 @@ use regex::Regex;
 use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     process::Stdio,
     str,
     sync::{Arc, LazyLock},
@@ -715,7 +715,7 @@ fn parse_grades_html(html: String) -> Result<GradesHashMap, anyhow::Error> {
 
     let row_selector = scraper::Selector::parse("tr").expect("could not parse row_selector");
 
-    let mut course_grades: GradesHashMap = HashMap::new();
+    let mut course_grades: GradesHashMap = BTreeMap::new();
     let mut current_course: Option<String> = None;
 
     for row in document.select(&row_selector) {

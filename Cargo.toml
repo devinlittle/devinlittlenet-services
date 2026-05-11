@@ -30,6 +30,7 @@ tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 futures-util = "0.3.32"
 serde = {version = "1", features = ["derive"]}
 serde_json = {version = "1"}
+serde_with = { version = "3.0", features = ["chrono_0_4"] }
 sha2 = {version = "0.10"}
 chrono = { version = "0.4", features = ["serde"] }
 argon2 = "0.5"

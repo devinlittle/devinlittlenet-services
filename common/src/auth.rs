@@ -14,6 +14,7 @@ pub struct Users {
 }
 
 #[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub struct ChangeRoleInput {
     #[schema(example = "gradegetter")]
     pub service: ServiceName,
