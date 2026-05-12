@@ -7,8 +7,8 @@ members = [
   "gradegetter/gradegetter_backend/",
   "gradegetter/crypto_utils/",
   "nanopass_backend/",
-  "common"
-]
+  "common",
+  "smalltalk_backend"]
 
 
 [workspace.dependencies]
@@ -25,7 +25,7 @@ utoipa = {version = "5.4", features = ["axum_extras", "uuid", "chrono"]}
 utoipa-swagger-ui = {version = "9.0", features = ["axum"]}
 rustls = { version = "0.23.37", features = ["ring"] }
 ring = "0.17.14"
-reqwest = {version = "0.12"}
+reqwest = {version = "0.12", features = ["json"]}
 tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 futures-util = "0.3.32"
 serde = {version = "1", features = ["derive"]}

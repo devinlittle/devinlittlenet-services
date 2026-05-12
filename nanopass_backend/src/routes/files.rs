@@ -3,13 +3,43 @@ use hyper::StatusCode;
 use sqlx::types::chrono::Utc;
 use uuid::Uuid;
 
-use crate::{routes::AppState, utils::secrets::SECRETS};
+use crate::routes::AppState;
 
 use common::{
     nanopass::{FileListing, FileListingInput, RemoveListingInput, RemoveSessionInput, Visibility},
-    notification::RoleMessage,
-    AuthenticatedUser, UserRole,
+    AuthenticatedUser,
 };
+
+#[utoipa::path(
+    get,
+    path = "/listings",
+    security(
+        ("bearer_auth" = []),
+    ),
+    responses(
+        (status = 200, description = "listing returned", body = Vec<FileListing>),
+        (status = 500, description = "uhmmm...failed"),
+    ),
+    tag = "file_listings"
+)]
+pub async fn get_listings(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthenticatedUser>,
+) -> Json<Vec<FileListing>> {
+    let listings: Vec<FileListing> = state
+        .files
+        .iter()
+        .filter(|l| match &l.visibility {
+            Visibility::Private => l.owner_id == user.uuid,
+            Visibility::Public => true,
+            Visibility::Restricted { allowlist } => {
+                allowlist.contains(&user.uuid) || l.owner_id == user.uuid
+            }
+        })
+        .map(|l| l.value().clone())
+        .collect();
+    Json(listings)
+}
 
 #[utoipa::path(
     post,
@@ -47,7 +77,14 @@ pub async fn create_listing(
         .insert(file_listing.id, file_listing.clone())
         .is_none()
     {
-        notify_listing_added(&file_listing, &state.client, &SECRETS.internal_api_key).await;
+        state
+            .broadcast_nanopass_event(
+                &file_listing,
+                common::nanopass::NanoPassPayload::ListingAdded {
+                    listing: file_listing.clone(),
+                },
+            )
+            .await;
         tracing::info!("{} added a new listing", &user.username);
         Json(file_listing).into_response()
     } else {
@@ -78,7 +115,16 @@ pub async fn modify_listing(
             let owned = req.clone();
             drop(listing);
             state.files.alter(&owned.id, |_, _| req);
-            notify_listing_modified(&owned, &state.client, &SECRETS.internal_api_key).await;
+
+            state
+                .broadcast_nanopass_event(
+                    &owned,
+                    common::nanopass::NanoPassPayload::ListingModified {
+                        listing: owned.clone(),
+                    },
+                )
+                .await;
+
             tracing::info!("{} motified a listing", &user.username);
             StatusCode::OK
         }
@@ -110,44 +156,22 @@ pub async fn remove_listing(
             let owned = listing.clone();
             drop(listing);
             state.files.remove(&req.listing_id);
-            notify_listing_removed(&owned, &state.client, &SECRETS.internal_api_key).await;
+
+            state
+                .broadcast_nanopass_event(
+                    &owned,
+                    common::nanopass::NanoPassPayload::ListingRemoved {
+                        listing: owned.clone(),
+                    },
+                )
+                .await;
+
             tracing::info!("{} removed a listing", &user.username);
             StatusCode::OK
         }
         Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
         None => StatusCode::NOT_FOUND,
     }
-}
-
-#[utoipa::path(
-    get,
-    path = "/listings",
-    security(
-        ("bearer_auth" = []),
-    ),
-    responses(
-        (status = 200, description = "listing returned", body = Vec<FileListing>),
-        (status = 500, description = "uhmmm...failed"),
-    ),
-    tag = "file_listings"
-)]
-pub async fn get_listings(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthenticatedUser>,
-) -> Json<Vec<FileListing>> {
-    let listings: Vec<FileListing> = state
-        .files
-        .iter()
-        .filter(|l| match &l.visibility {
-            Visibility::Private => l.owner_id == user.uuid,
-            Visibility::Public => true,
-            Visibility::Restricted { allowlist } => {
-                allowlist.contains(&user.uuid) || l.owner_id == user.uuid
-            }
-        })
-        .map(|l| l.value().clone())
-        .collect();
-    Json(listings)
 }
 
 #[utoipa::path(
@@ -180,152 +204,16 @@ pub async fn remove_all_session_listings(
     });
 
     for listing in &to_remove {
-        notify_listing_removed(listing, &state.client, &SECRETS.internal_api_key).await;
+        state
+            .broadcast_nanopass_event(
+                listing,
+                common::nanopass::NanoPassPayload::ListingRemoved {
+                    listing: listing.clone(),
+                },
+            )
+            .await
     }
 
     tracing::info!("{} removed their listings", &user.username);
     StatusCode::OK
-}
-
-async fn notify_listing_added(
-    listing: &FileListing,
-    client: &reqwest::Client,
-    internal_api_key: &str,
-) {
-    let message = serde_json::json!({
-        "namespace": "nanopass",
-        "id": Uuid::new_v4(),
-        "from_session_id": listing.session_id,
-        "target_session_id": null,
-        "payload": {
-            "type": "ListingAdded",
-            "listing": listing
-        }
-    });
-
-    let url = match &listing.visibility {
-        Visibility::Public => {
-            "http://notification_backend:3003/internal/global_message".to_string()
-        }
-        Visibility::Private => format!(
-            "http://notification_backend:3003/internal/user_message/{}",
-            listing.owner_id
-        ),
-        Visibility::Restricted { .. } => {
-            "http://notification_backend:3003/internal/global_message".to_string()
-        }
-    };
-
-    let _ = client
-        .post(url)
-        .header("Authorization", format!("Basic {}", internal_api_key))
-        .json(&message)
-        .send()
-        .await
-        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
-
-    let role_message_payload = serde_json::json!({
-        "namespace": "nanopass",
-        "payload": {
-            "type": "ListingAdded",
-        }
-    });
-
-    let role_message = RoleMessage {
-        target_role: UserRole::Devin,
-        message: role_message_payload.to_string(),
-    };
-
-    let _ = client
-        .post("http://notification_backend:3003/internal/role_message".to_string())
-        .header("Authorization", format!("Basic {}", internal_api_key))
-        .json(&role_message)
-        .send()
-        .await
-        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
-}
-
-async fn notify_listing_modified(
-    listing: &FileListing,
-    client: &reqwest::Client,
-    internal_api_key: &str,
-) {
-    let message = serde_json::json!({
-        "namespace": "nanopass",
-        "id": Uuid::new_v4(),
-        "from_session_id": listing.session_id,
-        "target_session_id": null,
-        "payload": {
-            "type": "ListingModified",
-            "listing": listing
-        }
-    });
-
-    let url = "http://notification_backend:3003/internal/global_message".to_string();
-
-    let _ = client
-        .post(url)
-        .header("Authorization", format!("Basic {}", internal_api_key))
-        .json(&message)
-        .send()
-        .await
-        .map_err(|err| tracing::error!("failed to notify listing motified: {}", err));
-}
-
-pub async fn notify_listing_removed(
-    listing: &FileListing,
-    client: &reqwest::Client,
-    internal_api_key: &str,
-) {
-    let message = serde_json::json!({
-        "namespace": "nanopass",
-        "id": Uuid::new_v4(),
-        "from_session_id": listing.session_id,
-        "target_session_id": null,
-        "payload": {
-            "type": "ListingRemoved",
-            "listing": listing
-        }
-    });
-
-    let url = match &listing.visibility {
-        Visibility::Public => {
-            "http://notification_backend:3003/internal/global_message".to_string()
-        }
-        Visibility::Private => format!(
-            "http://notification_backend:3003/internal/user_message/{}",
-            listing.owner_id
-        ),
-        Visibility::Restricted { .. } => {
-            "http://notification_backend:3003/internal/global_message".to_string()
-        }
-    };
-
-    let _ = client
-        .post(url)
-        .header("Authorization", format!("Basic {}", internal_api_key))
-        .json(&message)
-        .send()
-        .await
-        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
-
-    let role_message_payload = serde_json::json!({
-        "namespace": "nanopass",
-        "payload": {
-            "type": "ListingRemoved",
-        }
-    });
-
-    let role_message = RoleMessage {
-        target_role: UserRole::Devin,
-        message: role_message_payload.to_string(),
-    };
-
-    let _ = client
-        .post("http://notification_backend:3003/internal/role_message".to_string())
-        .header("Authorization", format!("Basic {}", internal_api_key))
-        .json(&role_message)
-        .send()
-        .await
-        .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
 }

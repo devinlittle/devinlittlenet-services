@@ -600,6 +600,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sqlx",
  "strum",
  "utoipa",
  "uuid",
@@ -3723,6 +3724,42 @@ dependencies = [
  "async-channel",
  "futures-core",
  "futures-io",
+]
+
+[[package]]
+name = "smalltalk_backend"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "axum-prometheus",
+ "axum-server",
+ "base64 0.22.1",
+ "common",
+ "constant_time_eq 0.5.0",
+ "crypto_utils",
+ "dashmap",
+ "dotenvy",
+ "hyper",
+ "hyper-tls",
+ "jsonwebtoken",
+ "reqwest",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "uuid",
 ]
 
 [[package]]

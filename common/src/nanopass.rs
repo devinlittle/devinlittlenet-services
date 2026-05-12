@@ -4,6 +4,8 @@ use serde_with::{formats::Strict, serde_as, TimestampSeconds};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::Namespaces;
+
 // used in nanopass/routes/files.rs
 #[derive(Deserialize, ToSchema)]
 pub struct RemoveListingInput {
@@ -27,8 +29,11 @@ pub struct RemoveSessionInternalInput {
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(tag = "type")]
 pub enum Visibility {
+    #[schema(title = "Private")]
     Private,
+    #[schema(title = "Public")]
     Public,
+    #[schema(title = "Restricted")]
     Restricted { allowlist: Vec<Uuid> },
 }
 
@@ -60,4 +65,57 @@ pub struct FileListingInput {
     pub created_at: DateTime<Utc>,
     pub visibility: Visibility,
     pub auto_accept: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct NanoPassMessage {
+    pub id: Uuid,
+    pub namespace: Namespaces,
+    pub from_session_id: Option<Uuid>, // nullable bc server could send a message
+    pub from_user_id: Option<Uuid>,    // nullable cuz server could send a message
+    pub target_user_id: Option<Uuid>,  // nullalbe bc the server could send a message
+    pub target_session_id: Option<Uuid>, // nullable bc it could be a broadcast or sent from server
+    pub payload: NanoPassPayload,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", content = "data")]
+pub enum NanoPassPayload {
+    #[schema(title = "FileQuery")]
+    FileQuery {
+        listing_id: Uuid,
+        requester_session_id: Uuid,
+    },
+    #[schema(title = "FileQueryResponse")]
+    FileQueryResponse {
+        listing_id: Uuid,
+        host_session_id: Uuid,
+    },
+    #[schema(title = "TransferRequest")]
+    TransferRequest {
+        listing_id: Uuid,
+        requester_session_id: Uuid,
+        requester_username: String,
+    },
+    #[schema(title = "TransferAccepted")]
+    TransferAccepted { listing_id: Uuid },
+    #[schema(title = "TransferDeclined")]
+    TransferDeclined { listing_id: Uuid },
+    #[schema(title = "SDPOffer")]
+    SDPOffer { listing_id: Uuid, sdp: String },
+    #[schema(title = "SDPAnswer")]
+    SDPAnswer { listing_id: Uuid, sdp: String },
+    #[schema(title = "ICECandidate")]
+    ICECandidate {
+        listing_id: Uuid,
+        candidate: String,
+        sdp_mid: Option<String>,
+        sdp_mline_index: Option<u32>,
+    },
+    #[schema(title = "ListingAdded")]
+    ListingAdded { listing: FileListing },
+    #[schema(title = "ListingModified")]
+    ListingModified { listing: FileListing },
+    #[schema(title = "ListingRemoved")]
+    ListingRemoved { listing: FileListing },
 }

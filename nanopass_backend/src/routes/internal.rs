@@ -2,10 +2,7 @@ use axum::{extract::State, Json};
 use common::nanopass::{FileListing, RemoveSessionInternalInput};
 use hyper::StatusCode;
 
-use crate::{
-    routes::{files::notify_listing_removed, AppState},
-    utils::secrets::SECRETS,
-};
+use crate::routes::AppState;
 
 #[utoipa::path(
     delete,
@@ -20,7 +17,7 @@ use crate::{
     ),
     tag = "file_listings"
 )]
-pub async fn remove_all_session_listings(
+pub async fn internal_remove_all_session_listings(
     State(state): State<AppState>,
     Json(req): Json<RemoveSessionInternalInput>,
 ) -> StatusCode {
@@ -36,7 +33,14 @@ pub async fn remove_all_session_listings(
     });
 
     for listing in &to_remove {
-        notify_listing_removed(listing, &state.client, &SECRETS.internal_api_key).await;
+        state
+            .broadcast_nanopass_event(
+                listing,
+                common::nanopass::NanoPassPayload::ListingRemoved {
+                    listing: listing.clone(),
+                },
+            )
+            .await
     }
 
     StatusCode::OK

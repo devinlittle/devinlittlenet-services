@@ -16,6 +16,9 @@ pub mod nanopass;
 #[cfg(feature = "notifications")]
 pub mod notification;
 
+#[cfg(feature = "smalltalk")]
+pub mod smalltalk;
+
 #[derive(Clone, ToSchema, Serialize, Deserialize, Debug)]
 pub struct AuthenticatedUser {
     pub username: String,
@@ -65,4 +68,19 @@ impl UserRole {
     pub fn is_admin(&self) -> bool {
         matches!(self, Self::Devin | Self::Owen)
     }
+}
+
+#[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug, ToSchema, strum::Display)]
+#[serde(rename_all = "lowercase")]
+#[schema(rename_all = "lowercase")]
+pub enum Namespaces {
+    Notification,
+    NanoPass,
+    GradeGetter,
+    #[serde(rename = "smalltalk_keysync")]
+    #[schema(rename = "smalltalk_keysync")]
+    SmallTalkKeySync,
+    #[serde(rename = "smalltalk_notes")]
+    #[schema(rename = "smalltalk_notes")]
+    SmallTalkNotes,
 }

@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use axum_prometheus::PrometheusMetricLayerBuilder;
-use common::nanopass::FileListing;
+use common::nanopass::{FileListing, NanoPassMessage, NanoPassPayload, Visibility};
 use dashmap::DashMap;
 use hyper::StatusCode;
 use std::sync::Arc;
@@ -15,7 +15,10 @@ use utoipa::{
 use utoipa_swagger_ui::SwaggerUi;
 use uuid::Uuid;
 
-use crate::middleware::{internal::basic_auth, jwt::jwt_auth};
+use crate::{
+    middleware::{internal::basic_auth, jwt::jwt_auth},
+    utils::secrets::SECRETS,
+};
 
 mod files;
 mod internal;
@@ -29,7 +32,7 @@ mod internal;
         crate::routes::files::remove_listing,
         crate::routes::files::get_listings,
         crate::routes::files::remove_all_session_listings,
-        crate::routes::internal::remove_all_session_listings
+        crate::routes::internal::internal_remove_all_session_listings
     ),
     components(
         schemas(
@@ -37,6 +40,7 @@ mod internal;
             common::nanopass::RemoveSessionInput,
             common::nanopass::RemoveSessionInternalInput,
             common::nanopass::FileListingInput,
+            common::nanopass::NanoPassMessage,
         )
     ),
     modifiers(&JwtBearer, &InternalAuth),
@@ -94,6 +98,45 @@ pub struct AppState {
     pub client: reqwest::Client,
 }
 
+impl AppState {
+    pub async fn broadcast_nanopass_event(&self, listing: &FileListing, event: NanoPassPayload) {
+        let message = NanoPassMessage {
+            id: Uuid::new_v4(),
+            namespace: common::Namespaces::NanoPass,
+            from_session_id: None,
+            from_user_id: None,
+            target_user_id: Some(listing.owner_id),
+            target_session_id: None,
+            payload: event,
+        };
+
+        let url = match &listing.visibility {
+            Visibility::Public => {
+                "http://notification_backend:3003/internal/global_message".to_string()
+            }
+            Visibility::Private => format!(
+                "http://notification_backend:3003/internal/user_message/{}",
+                listing.owner_id
+            ),
+            Visibility::Restricted { .. } => {
+                "http://notification_backend:3003/internal/global_message".to_string()
+            }
+        };
+
+        let _ = self
+            .client
+            .post(url)
+            .header(
+                "Authorization",
+                format!("Basic {}", SECRETS.internal_api_key.as_str()),
+            )
+            .json(&message)
+            .send()
+            .await
+            .map_err(|err| tracing::error!("failed to notify listing added: {}", err));
+    }
+}
+
 pub fn create_routes() -> Router {
     let files = Arc::new(DashMap::new());
 
@@ -128,7 +171,7 @@ pub fn create_routes() -> Router {
     let internal_routes = Router::new()
         .route(
             "/internal/session_cleanup",
-            post(internal::remove_all_session_listings),
+            post(internal::internal_remove_all_session_listings),
         )
         .layer(middleware::from_fn(basic_auth));
 
