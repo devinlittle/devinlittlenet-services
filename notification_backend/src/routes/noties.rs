@@ -294,9 +294,13 @@ pub async fn notify(
 #[utoipa::path(
     post,
     path = "/user_message/{id}",
-    request_body = String,
+    request_body(
+        content = String, 
+        description = "The raw message body", 
+        content_type = "text/plain"
+    ),
     params(
-        ("id", description = "contains a uuid")
+        ("id" = String, Path, description = "contains a uuid")
     ),
     security(
         ("bearer_auth" = []),

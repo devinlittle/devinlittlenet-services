@@ -443,7 +443,7 @@ pub async fn search_user(
 
 #[utoipa::path(
     post,
-    path = "/users/by-id",
+    path = "/users/by-ids",
     request_body = ByIdsInput,
     security(
         ("bearer_auth" = [])
