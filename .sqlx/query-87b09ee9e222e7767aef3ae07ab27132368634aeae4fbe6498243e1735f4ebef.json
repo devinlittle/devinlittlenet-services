@@ -11,8 +11,8 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Varchar"
+        "Bytea",
+        "Uuid"
       ]
     },
     "nullable": [

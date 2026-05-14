@@ -178,7 +178,7 @@ pub async fn list_active_sessions(
     let sessions = sqlx::query!(
         "SELECT id, expires_at, user_agent, token_hash FROM refresh_tokens
         WHERE user_id = $1
-        AND replaced_by_token IS NULL",
+        AND revoked_at IS NULL",
         user.uuid
     )
     .fetch_all(&pool)

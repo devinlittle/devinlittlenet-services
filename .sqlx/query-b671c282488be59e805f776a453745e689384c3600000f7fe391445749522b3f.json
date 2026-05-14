@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, expires_at, user_agent, token_hash FROM refresh_tokens\n        WHERE user_id = $1\n        AND replaced_by_token IS NULL",
+  "query": "SELECT id, expires_at, user_agent, token_hash FROM refresh_tokens\n        WHERE user_id = $1\n        AND revoked_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -21,7 +21,7 @@
       {
         "ordinal": 3,
         "name": "token_hash",
-        "type_info": "Varchar"
+        "type_info": "Bytea"
       }
     ],
     "parameters": {
@@ -33,8 +33,8 @@
       false,
       false,
       false,
-      false
+      true
     ]
   },
-  "hash": "129a3a0b603ca92a144f60a8c961be509af2965031f7bcdb11426ef6b3e044ae"
+  "hash": "b671c282488be59e805f776a453745e689384c3600000f7fe391445749522b3f"
 }
