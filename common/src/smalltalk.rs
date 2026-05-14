@@ -31,7 +31,8 @@ pub struct SmalltalkNote {
     pub updated_at: DateTime<Utc>,
     #[serde(with = "chrono::serde::ts_milliseconds")]
     pub created_at: DateTime<Utc>,
-    pub last_accessed_at: Option<i64>,
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub last_accessed_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -47,6 +48,16 @@ pub struct NotePatchRequest {
     pub rank: Option<i32>,
     pub is_pinned: Option<bool>,
     pub is_deleted: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct NoteCreateRequest {
+    #[schema(value_type = Option<String>, format = Binary)]
+    pub enc_name: Vec<u8>,
+    pub is_protected: Option<bool>,
+    pub password_hash: Option<String>,
+    #[schema(value_type = Option<String>, format = Binary)]
+    pub salt: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

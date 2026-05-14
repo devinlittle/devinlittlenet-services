@@ -24,17 +24,16 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"]  }
 anyhow.workspace = true
 
-sha2.workspace = true
 sqlx = { workspace = true, features = [
   "runtime-tokio-rustls",
   "postgres",
   "migrate",
   "json",
-  "time",
+  "chrono",
   "uuid"]}
 uuid.workspace = true
-time.workspace = true
 jsonwebtoken.workspace = true
+chrono.workspace = true
 web-push.workspace = true
 crypto_utils.workspace = true
 base64.workspace = true
@@ -45,6 +44,3 @@ tracing-subscriber.workspace = true
 
 dotenvy.workspace = true
 constant_time_eq.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-openssl = { version = "0.10", features = ["vendored"] }

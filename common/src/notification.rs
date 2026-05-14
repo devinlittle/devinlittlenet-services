@@ -5,6 +5,8 @@ use uuid::Uuid;
 use crate::UserRole;
 
 // used in nanopass/routes/internal.rs
+// HACK:
+// TODO: make this better
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RoleMessage {
     pub target_role: UserRole,
@@ -24,6 +26,14 @@ pub struct SubscriptionKeys {
     pub auth: String,
 }
 
+pub struct PushSubscription {
+    pub endpoint: String,
+    pub p256dh: String,
+    pub auth: String,
+}
+
+// HACK:
+// TODO: make this better
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct NotificationMessage {
     r#type: NotificationType,
@@ -49,10 +59,4 @@ pub struct Bootstrap {
 pub struct SendNotification {
     pub recipient: String,
     pub content: String,
-}
-
-pub struct PushSubscription {
-    pub endpoint: String,
-    pub p256dh: String,
-    pub auth: String,
 }

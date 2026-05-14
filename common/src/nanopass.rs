@@ -69,8 +69,8 @@ pub struct FileListingInput {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct NanoPassMessage {
-    pub id: Uuid,
     pub namespace: Namespaces,
+    pub id: Uuid,
     pub from_session_id: Option<Uuid>, // nullable bc server could send a message
     pub from_user_id: Option<Uuid>,    // nullable cuz server could send a message
     pub target_user_id: Option<Uuid>,  // nullalbe bc the server could send a message

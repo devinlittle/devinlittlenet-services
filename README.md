@@ -12,6 +12,7 @@ currnetly includes:
 * gradegetter service
 * notification service
 * nanopass
+* smalltalk
 
 ports used:
 
@@ -20,3 +21,4 @@ ports used:
 * 3002 -- gradegetter_backend service
 * 3003 -- notification_backend service
 * 3004 -- nanopass_backend service
+* 3005 -- smalltalk_backend service

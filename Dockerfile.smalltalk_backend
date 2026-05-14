@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1
+ARG RUST_VERSION=1.95.0
+ARG ALPINE_VERSION=3.23.4
+ARG APP_NAME=smalltalk_backend
+
+################################################################################
+FROM rust:${RUST_VERSION}-alpine AS build
+ARG APP_NAME
+WORKDIR /app
+COPY . .
+
+RUN apk add --no-cache clang lld musl-dev git perl make curl
+ENV RUSTFLAGS="-C link-arg=-fuse-ld=lld"
+
+ENV SQLX_OFFLINE=true
+RUN --mount=type=cache,target=/app/target/,id=${APP_NAME} \
+    --mount=type=cache,target=/usr/local/cargo/git/db \
+    --mount=type=cache,target=/usr/local/cargo/registry/ \
+cargo build --locked --release --bin ${APP_NAME} && \
+cp ./target/release/$APP_NAME /bin/server
+
+################################################################################
+FROM rust:${RUST_VERSION}-alpine AS sqlx_build
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo install sqlx-cli --no-default-features --features postgres && \
+    cp /usr/local/cargo/bin/sqlx /bin/sqlx
+
+################################################################################
+FROM alpine:${ALPINE_VERSION} AS final
+
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid "${UID}" \
+    appuser
+
+COPY --from=build /bin/server /bin/
+COPY --from=sqlx_build /usr/local/cargo/bin/sqlx /bin/sqlx
+COPY --chown=appuser ./smalltalk_backend/migrations /migrations
+
+USER appuser
+ENV RUST_LOG=info
+EXPOSE 3005
+
+CMD ["/bin/server"]

@@ -1,6 +1,6 @@
 use axum::{extract::State, response::IntoResponse, Extension, Json};
+use chrono::Utc;
 use hyper::StatusCode;
-use sqlx::types::chrono::Utc;
 use uuid::Uuid;
 
 use crate::routes::AppState;
