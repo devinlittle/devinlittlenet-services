@@ -46,6 +46,7 @@ mod noties;
             common::notification::RoleMessage,
             common::notification::SubscribeRequest,
             common::notification::SendNotification,
+            common::Namespaces,
         )
     ),
     modifiers(&JwtBearer, &InternalAuth),
