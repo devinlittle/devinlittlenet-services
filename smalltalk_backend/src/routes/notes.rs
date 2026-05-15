@@ -3,22 +3,23 @@ use axum::{
     response::IntoResponse,
     Extension, Json,
 };
+use chrono::{DateTime, Utc};
 use common::{
     smalltalk::{NoteCreateRequest, NotePatchRequest, SmalltalkNote, SmalltalkNotesEvent},
     AuthenticatedUser,
 };
 use hyper::StatusCode;
-use serde::Deserialize;
-use sqlx::{
-    types::chrono::{DateTime, Utc},
-    Postgres, QueryBuilder,
-};
+use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, QueryBuilder};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::routes::AppState;
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct NoteSyncParams {
+    /// Unix timestamp in milliseconds
+    #[schema(value_type = i64, example = 1715760000000_i64)]
     #[serde(with = "chrono::serde::ts_milliseconds")]
     pub since: DateTime<Utc>,
 }
@@ -26,7 +27,7 @@ pub struct NoteSyncParams {
 #[utoipa::path(
     get,
     path = "/notes",
-    params(("since", Query, description = "timestamp to grab notes after that timestamp")),
+    params(("since" = i64 , Query, description = "unix timestamp in milliseconds to grab notes after")),
     security(
         ("bearer_auth" = [])
     ),

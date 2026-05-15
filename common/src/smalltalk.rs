@@ -27,10 +27,16 @@ pub struct SmalltalkNote {
     // Metadata and da UI
     pub rank: i32,
     pub is_deleted: bool,
+    /// Unix timestamp in milliseconds
+    #[schema(value_type = i64, example = 1715760000000_i64)]
     #[serde(with = "chrono::serde::ts_milliseconds")]
     pub updated_at: DateTime<Utc>,
+    /// Unix timestamp in milliseconds
+    #[schema(value_type = i64, example = 1715760000000_i64)]
     #[serde(with = "chrono::serde::ts_milliseconds")]
     pub created_at: DateTime<Utc>,
+    /// Unix timestamp in milliseconds
+    #[schema(value_type = i64, example = 1715760000000_i64)]
     #[serde(with = "chrono::serde::ts_milliseconds")]
     pub last_accessed_at: DateTime<Utc>,
 }
