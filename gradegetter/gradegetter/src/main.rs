@@ -477,8 +477,9 @@ static FORM_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| {
 static FORM_TOKEN_RE_GP: LazyLock<Regex> =
     LazyLock::new(|| regex::Regex::new(r#"form-token" value="([^"]+)""#).unwrap());
 
-static GRADING_PEROID_RE: LazyLock<Regex> =
-    LazyLock::new(|| regex::Regex::new(r#"name="grading_period\[(\d+)\]""#).unwrap());
+static GRADING_PEROID_RE: LazyLock<Regex> = LazyLock::new(|| {
+    regex::Regex::new(r#"name="grading_period\[(\d+)\]".*?form-checkbox-title">.*?Q\d"#).unwrap()
+});
 
 static COURSE_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| regex::Regex::new(r#"courses\[(\d+)\]\[selected\]"#).unwrap());
