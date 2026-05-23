@@ -61,6 +61,7 @@ pub enum ServiceName {
 pub enum UserRole {
     Devin,
     Owen,
+    MrD,
     Trusted,
     User,
 }

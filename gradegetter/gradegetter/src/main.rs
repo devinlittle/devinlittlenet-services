@@ -249,6 +249,8 @@ async fn main() -> Result<(), anyhow::Error> {
         );
 
     let listener = TcpListener::bind("0.0.0.0:3001").await.unwrap();
+
+    info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await

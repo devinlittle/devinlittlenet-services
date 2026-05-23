@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, token_hash FROM refresh_tokens WHERE token_hash = $1",
+  "query": "SELECT user_id, token_hash FROM refresh_tokens WHERE token_hash = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "user_id",
         "type_info": "Uuid"
       },
       {
@@ -21,8 +21,8 @@
     },
     "nullable": [
       false,
-      true
+      false
     ]
   },
-  "hash": "c3d5b17c545d50c31054e68da8ad7ae1d0c76620fdbd8b7a2e0fe2b2198cec74"
+  "hash": "fda6ced4bf59dce546c4f770a786a6befda02b9b2e25a456a96f5140a2f87776"
 }

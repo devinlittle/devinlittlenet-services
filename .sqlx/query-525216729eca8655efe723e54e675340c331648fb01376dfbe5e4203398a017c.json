@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refresh_tokens\n         SET revoked_at = NOW(), replaced_by_token = $2\n         WHERE token_hash = $1\n         AND revoked_at IS NULL\n         AND expires_at > NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "525216729eca8655efe723e54e675340c331648fb01376dfbe5e4203398a017c"
+}

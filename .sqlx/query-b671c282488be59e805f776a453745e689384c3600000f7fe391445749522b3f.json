@@ -11,7 +11,7 @@
       {
         "ordinal": 1,
         "name": "expires_at",
-        "type_info": "Timestamp"
+        "type_info": "Timestamptz"
       },
       {
         "ordinal": 2,
@@ -33,7 +33,7 @@
       false,
       false,
       false,
-      true
+      false
     ]
   },
   "hash": "b671c282488be59e805f776a453745e689384c3600000f7fe391445749522b3f"

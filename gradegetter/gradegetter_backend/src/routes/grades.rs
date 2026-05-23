@@ -25,11 +25,6 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<GradesHashMap>, StatusCode> {
-    // WARN: this commented code below me is bugged bc it uses the old string'd roles
-    /* if user.role != "devin" && user.role != "owen" && user.role != "trusted" {
-        return Err(StatusCode::FORBIDDEN);
-    } */
-
     let grades_row = sqlx::query!("SELECT grades FROM grades WHERE id = $1", user.uuid)
         .fetch_optional(&state.pool)
         .await
@@ -40,7 +35,7 @@ pub async fn grades_handler(
 
     let encrypted_grades = match grades_row {
         Some(encrypted_grades) => encrypted_grades,
-        None => return Err(StatusCode::NOT_FOUND),
+        None => return { Err(StatusCode::NOT_FOUND) },
     };
 
     let grades = decrypt_string(encrypted_grades.grades.as_str()).map_err(|err| {
