@@ -5,9 +5,11 @@ use axum_extra::{
 };
 use common::{AuthenticatedUser, Claims};
 use jsonwebtoken::{DecodingKey, Validation};
+//use tracing::instrument;
 
 use crate::util::secrets::SECRETS;
 
+//#[instrument(name = "middleware.jwt_auth", skip(bearer, request, next))]
 pub async fn jwt_auth(
     TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
     mut request: Request,
@@ -36,7 +38,7 @@ pub async fn jwt_auth(
             StatusCode::UNAUTHORIZED
         })?;
 
-    let uuid = uuid::Uuid::parse_str(&decoded_jwt.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let uuid = decoded_jwt.sub;
     let username = decoded_jwt.username;
     let role = decoded_jwt
         .roles

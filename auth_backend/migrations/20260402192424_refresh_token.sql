@@ -8,7 +8,7 @@ CREATE TABLE refresh_tokens (
     replaced_by_token UUID NULL,
     user_agent TEXT NOT NULL,
 
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 
     CONSTRAINT fk_replaced_by_token
         FOREIGN KEY (replaced_by_token) REFERENCES refresh_tokens(id)

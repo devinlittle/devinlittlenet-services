@@ -7,6 +7,7 @@ use base64::prelude::*;
 
 use crate::util::secrets::SECRETS;
 
+// TODO: deprecate this internal shit for grpc
 pub async fn basic_auth(
     TypedHeader(Authorization(basic)): TypedHeader<Authorization<Basic>>,
     request: Request,

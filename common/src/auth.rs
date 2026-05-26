@@ -13,7 +13,7 @@ pub struct Users {
     pub roles: UserRoles,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, Debug, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub struct ChangeRoleInput {
     #[schema(example = "gradegetter")]

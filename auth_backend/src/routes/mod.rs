@@ -18,14 +18,14 @@ mod user;
 #[derive(OpenApi)]
 #[openapi(
       paths(
+        crate::routes::health,
         // Auth paths
         crate::routes::auth::register_handler,
         crate::routes::auth::login_handler,
         crate::routes::auth::logout_handler,
         crate::routes::auth::refresh_handler,
-        crate::routes::auth::health,
         // User Routes
-        crate::routes::user::add_publickey,
+        crate::routes::user::add_account_info,
         crate::routes::user::delete_handler,
         crate::routes::user::list_active_sessions,
         crate::routes::user::revoke_specific_session,
@@ -107,6 +107,18 @@ impl utoipa::Modify for InternalAuth {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Service is alive"),
+    ),
+    tag = "none"
+)]
+pub async fn health() -> Result<(), axum::http::StatusCode> {
+    Ok(())
+}
+
 pub fn create_routes(pool: PgPool) -> Router {
     let (prometheus_layer, metric_handle) = PrometheusMetricLayerBuilder::new()
         .with_prefix("auth_backend")
@@ -119,13 +131,13 @@ pub fn create_routes(pool: PgPool) -> Router {
         .route("/refresh", post(auth::refresh_handler))
         .route("/logout", get(auth::logout_handler))
         .route("/metrics", get(|| async move { metric_handle.render() }))
-        .route("/health", get(auth::health));
+        .route("/health", get(health));
 
     let routes_with_middleware = Router::new()
         // User Routes
         .route(
             "/me",
-            patch(user::add_publickey).delete(user::delete_handler),
+            patch(user::add_account_info).delete(user::delete_handler),
         )
         .route(
             "/me/sessions",

@@ -7,6 +7,8 @@ use hyper::StatusCode;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+// WARN: not fixing cuz soon im gonna be using grpc for internal calls
+
 #[utoipa::path(
     get,
     path = "/internal/users/{uuid}/roles",

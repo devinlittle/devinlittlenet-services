@@ -36,7 +36,7 @@ pub async fn jwt_auth(
             StatusCode::UNAUTHORIZED
         })?;
 
-    let uuid = uuid::Uuid::parse_str(&decoded_jwt.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let uuid = decoded_jwt.sub;
     let username = decoded_jwt.username;
     let role = decoded_jwt
         .roles

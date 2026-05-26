@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[cfg(feature = "auth")]
 pub mod auth;
@@ -23,7 +24,7 @@ pub mod tracing;
 #[derive(Clone, ToSchema, Serialize, Deserialize, Debug)]
 pub struct AuthenticatedUser {
     pub username: String,
-    pub uuid: uuid::Uuid,
+    pub uuid: Uuid,
     pub role: UserRole,
 }
 
@@ -31,7 +32,7 @@ pub type UserRoles = HashMap<ServiceName, UserRole>;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Claims {
-    pub sub: String,
+    pub sub: Uuid,
     pub username: String,
     pub roles: UserRoles,
     pub public_key: Option<String>,
@@ -53,6 +54,8 @@ pub enum ServiceName {
     Smalltalk,
     #[serde(alias = "Notifications")]
     Notifications,
+    #[serde(alias = "PodcastSchoolProject")]
+    PodcastSchoolProject,
 }
 
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug, ToSchema, strum::Display)]

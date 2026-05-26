@@ -6,11 +6,11 @@ use axum::{
     Extension, Json,
 };
 use axum_extra::{headers::Cookie, TypedHeader};
-use chrono::{DateTime, Utc};
 use constant_time_eq::constant_time_eq;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::uuid, PgPool};
+use tracing::{error, info, instrument, warn};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -24,6 +24,14 @@ use common::{
     AuthenticatedUser,
 };
 
+#[instrument(
+    name = "user_add_info",
+    skip(pool, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     patch,
     path = "/me",
@@ -38,7 +46,7 @@ use common::{
     ),
     tag = "user_auth"
 )]
-pub async fn add_publickey(
+pub async fn add_account_info(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<UpdateProfileInput>,
@@ -60,11 +68,38 @@ pub async fn add_publickey(
     .await;
 
     match result {
-        Ok(_) => StatusCode::OK,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Ok(_) => {
+            info!(
+                action = "auth.add_account_info",
+                user.username = %user.username,
+                user.id = %user.uuid,
+                "[INFO]: Added Info to account!"
+            );
+
+            StatusCode::OK
+        }
+        Err(err) => {
+            error!(
+                action = "auth.add_account_info",
+                error = %err,
+                user.username = %user.username,
+                user.id = %user.uuid,
+                "[ERROR]: Failed to add info to account"
+            );
+
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 
+#[instrument(
+    name = "user_deletion",
+    skip(pool),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     delete,
     path = "/me",
@@ -104,34 +139,52 @@ pub async fn delete_handler(
             )
             .await;
 
-            tracing::info!("deleted user: {}", user.username);
+            delete_and_invalidate(
+                "http://smalltalk_backend:3005/internal".to_string(),
+                &client,
+                &user,
+            )
+            .await;
+
+            info!(
+                target: "audit",
+                action = "auth.delete",
+                user.id = %user.uuid,
+                user.username = %user.username,
+                "[Security Event]: User deleted their account"
+            );
+
             Ok((axum::http::StatusCode::OK).into_response())
         }
-        Ok(_) => Err(StatusCode::NOT_FOUND),
+        Ok(_) => {
+            warn!(
+                target: "audit",
+                action = "auth.delete",
+                reason = "username_not_found",
+                user.username = %user.username,
+                user.id= %user.uuid,
+                "[Security Alert]: Failed login attempt on non existent username"
+            );
+            Err(StatusCode::NOT_FOUND)
+        }
         Err(err) => {
-            tracing::error!("database error: {:?}", err);
+            error!(error = %err, "[Database failure]: failed attempt to delete user");
             Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
 
+#[instrument(
+    name = "delete_and_invalidate_from_services",
+    skip(client),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        url = url,
+    )
+)]
 pub async fn delete_and_invalidate(url: String, client: &Client, user: &AuthenticatedUser) {
-    let _ = client
-        .delete(format!("{}/delete/{}", url, user.uuid))
-        .header(
-            "Authorization",
-            format!("Basic {}", SECRETS.internal_api_key.as_str()),
-        )
-        .send()
-        .await
-        .map_err(|err| {
-            tracing::error!(
-                "failed to delete user from service with url {}: {}",
-                url,
-                err
-            )
-        });
-
+    // TODO: debug right here
     let _ = client
         .get(format!("{}/invalidate/{}", url, user.uuid))
         .header(
@@ -141,14 +194,67 @@ pub async fn delete_and_invalidate(url: String, client: &Client, user: &Authenti
         .send()
         .await
         .map_err(|err| {
-            tracing::error!(
-                "failed to invalidate user from service with url {}: {}",
-                url,
-                err
+            error!(
+                error = %err,
+                url = url,
+                "[Internal Service failure]: failed to invalidate user"
+            );
+        });
+
+    // TODO: debug right here
+    let _ = client
+        .delete(format!("{}/delete/{}", url, user.uuid))
+        .header(
+            "Authorization",
+            format!("Basic {}", SECRETS.internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            error!(
+                error = %err,
+                url = url,
+                "[Internal Service failure]: failed to delete user"
             );
         });
 }
 
+#[instrument(
+    name = "invalidate_from_services",
+    skip(client),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        url = url,
+    )
+)]
+pub async fn invalidate(url: String, client: &Client, user: &AuthenticatedUser) {
+    // TODO: debug right here
+    let _ = client
+        .get(format!("{}/invalidate/{}", url, user.uuid))
+        .header(
+            "Authorization",
+            format!("Basic {}", SECRETS.internal_api_key.as_str()),
+        )
+        .send()
+        .await
+        .map_err(|err| {
+            error!(
+                error = %err,
+                url = url,
+                "[Internal Service failure]: failed to invalidate user"
+            );
+        });
+}
+
+#[instrument(
+    name = "user_list_sessions",
+    skip(pool, cookies),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     get,
     path = "/me/sessions",
@@ -169,9 +275,14 @@ pub async fn list_active_sessions(
     TypedHeader(cookies): TypedHeader<Cookie>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let refresh_token = if cookies.get("refresh_token").is_some() {
+    let refresh_token = if cookies.get("refresh_token").is_some_and(|x| !x.is_empty()) {
         cookies.get("refresh_token").unwrap_or_default()
     } else {
+        warn!(
+            action = "auth.list_active_sessions",
+            reason = "no refresh_token provided",
+            "[Security Alert]: Failed to list active sessions; no token to revoke provided"
+        );
         return Err(StatusCode::UNAUTHORIZED);
     };
 
@@ -184,38 +295,43 @@ pub async fn list_active_sessions(
     .fetch_all(&pool)
     .await
     .map_err(|err| {
-        tracing::error!("failed to grab all active sessions: {}", err);
+        error!(error = %err, "[Database failure]: failed to grab all active sessions");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    #[allow(clippy::redundant_closure)]
     let sessions: Vec<ActiveSessions> = sessions
         .iter()
         .map(|session| ActiveSessions {
             session_id: session.id,
-            expires_at: DateTime::from_timestamp(
-                session.expires_at.assume_utc().unix_timestamp(),
-                0,
-            )
-            .unwrap_or_else(|| Utc::now()),
+            expires_at: session.expires_at,
             user_agent: session.user_agent.clone(),
-            is_current: {
-                validate(
-                    refresh_token,
-                    session.token_hash.clone().unwrap_or_default(),
-                )
-            },
+            is_current: { validate(refresh_token, session.token_hash.clone()) },
         })
         .collect();
 
     let output = serde_json::to_value(sessions).map_err(|err| {
-        tracing::error!("failed to seriliaze sessions_hashset: {}", err);
+        error!(error = %err, "[Serialization Faliure]: Failed to serialize sessions into output for func");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    info!(
+        action = "auth.list_active_sessions",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[INFO]: User retrieved their active sessions successfully"
+    );
 
     Ok(Json(output).into_response())
 }
 
+#[instrument(
+    name = "user_delete_all_sessions",
+    skip(pool),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     delete,
     path = "/me/sessions",
@@ -245,18 +361,41 @@ pub async fn revoke_all_sessions(
     {
         Ok(result) => {
             if result.rows_affected() > 0 {
+                info!(
+                    target: "audit",
+                    action = "auth.token_revoke_all",
+                    user.id = %user.uuid,
+                    user.username = %user.username,
+                    "[Security Event]: User revoked all sessions on their account"
+                );
                 Ok((StatusCode::OK).into_response())
             } else {
+                warn!(
+                    target: "audit",
+                    action = "auth.token_revoke_all",
+                    reason = "username_not_found",
+                    user.username = %user.username,
+                    user.id= %user.uuid,
+                    "[Security Alert]: Failed to revoke sessions, no active sessions? weird bug"
+                );
                 Err(StatusCode::NOT_MODIFIED)
             }
         }
         Err(err) => {
-            tracing::error!("error revoking all sessions: {}", err);
+            error!(error = %err, "[Database failure]: failed attempt to revoke user tokens");
             Err(StatusCode::UNAUTHORIZED)
         }
     }
 }
 
+#[instrument(
+    name = "user_delete_session",
+    skip(pool),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     delete,
     path = "/me/session/{id}",
@@ -292,18 +431,40 @@ pub async fn revoke_specific_session(
     {
         Ok(result) => {
             if result.rows_affected() > 0 {
+                info!(
+                    target: "audit",
+                    action = "auth.token_specific_revoke",
+                    user.id = %user.uuid,
+                    user.username = %user.username,
+                    "[Security Event]: User revoked a specific session on their account"
+                );
                 Ok((StatusCode::OK).into_response())
             } else {
+                info!(
+                    target: "audit",
+                    action = "auth.token_specific_revoke",
+                    user.id = %user.uuid,
+                    user.username = %user.username,
+                    "[Security Event]: User revoked a specific session on their account"
+                );
                 Err(StatusCode::NOT_MODIFIED)
             }
         }
         Err(err) => {
-            tracing::error!("error revoking all sessions: {}", err);
+            error!(error = %err, "[Database failure]: failed attempt to revoke a users token");
             Err(StatusCode::UNAUTHORIZED)
         }
     }
 }
 
+#[instrument(
+    name = "user_add_recovery_info",
+    skip(pool, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     patch,
     path = "/me/recovery",
@@ -336,11 +497,32 @@ pub async fn add_recovery_info(
     .execute(&pool)
     .await
     {
-        Ok(_) => Ok(StatusCode::OK),
-        Err(_) => Err(StatusCode::CONFLICT),
+        Ok(_) => {
+            //TODO: log
+            info!(
+                target = "audit",
+                action = "auth.add_recovery_info",
+                user.id = %user.uuid,
+                user.username = %user.username,
+                "[Secuirty Event]: User added recovery info"
+            );
+            Ok(StatusCode::OK)
+        }
+        Err(err) => {
+            error!(error = %err, "[Database failure]: failed to add recovery info");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
+#[instrument(
+    name = "user_recovery_info",
+    skip(pool, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     post,
     path = "/me/recovery/verify",
@@ -370,15 +552,53 @@ pub async fn verify_recovery_info(
     )
     .fetch_one(&pool)
     .await
-    .map_err(|_| StatusCode::NOT_FOUND)?;
+    .map_err(|err| {
+        error!(error = %err, "[Database failure]: failure grabbing recovery info from db");
+        StatusCode::NOT_FOUND
+    })?;
 
-    let recovery_hash = result.recovery_hash.ok_or(StatusCode::NOT_FOUND)?;
+    let recovery_hash = result.recovery_hash.ok_or({
+        warn!(
+            action = "auth.verify_recovery_info",
+            reason = "no_recovery_hash_in_db",
+            user.id = %user.uuid,
+            user.username = %user.username,
+            "[INFO]: No recovery hash is contained in the db"
+        );
+        StatusCode::NOT_FOUND
+    })?;
 
-    let encrypted_private_key = result.encrypted_private_key.ok_or(StatusCode::NOT_FOUND)?;
+    let encrypted_private_key = result.encrypted_private_key.ok_or({
+        warn!(
+            action = "auth.verify_recovery_info",
+            reason = "no_privatekey_in_db",
+            user.id = %user.uuid,
+            user.username = %user.username,
+            "[INFO]: No encytped private key is contained in the db"
+        );
+        StatusCode::NOT_FOUND
+    })?;
 
     if !constant_time_eq(recovery_hash.as_bytes(), req.recovery_hash.as_bytes()) {
+        warn!(
+            target: "audit",
+            action = "auth.verify_recovery_info",
+            reason = "invalid_credentials",
+            user.id = %user.uuid,
+            user.username = %user.username,
+            "[INFO]: Failed recovery attempt bc of incorrect credentials"
+        );
+
         return Err(StatusCode::FORBIDDEN);
     }
+
+    info!(
+        target: "audit",
+        action = "auth.verify_recovery_info",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[Security Event]: Gave user encrypted privatekey"
+    );
 
     Ok(Json(VerifyRecoveryInfoOutputs {
         encrypted_private_key,
@@ -401,6 +621,14 @@ pub struct SearchParams {
     pub q: String,
 }
 
+#[instrument(
+    name = "user_search_by_query",
+    skip(pool, search_query),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     get,
     path = "/users/search",
@@ -427,8 +655,6 @@ pub async fn search_user(
 
     let query = format!("%{}%", search_query.q.trim());
 
-    tracing::debug!("{}", query);
-
     let results = sqlx::query_as!(
         UserSearchResult,
         r#"
@@ -443,14 +669,30 @@ pub async fn search_user(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        error!(error = %err, "[Database failure]: failure searching for user");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    tracing::debug!("{:?}", results);
+    info!(
+        action = "auth.search_user",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[INFO]: User searched for another"
+    );
 
     Ok(Json(results))
 }
 
 // TODO: check if is_admin and then if so send user's roles too!
+#[instrument(
+    name = "user_search_by_ids",
+    skip(pool, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid
+    )
+)]
 #[utoipa::path(
     post,
     path = "/users/by-ids",
@@ -468,7 +710,7 @@ pub async fn search_user(
 )]
 pub async fn get_users_by_ids(
     State(pool): State<PgPool>,
-    Extension(_user): Extension<AuthenticatedUser>,
+    Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<ByIdsInput>,
 ) -> Result<Json<Vec<UserSearchResult>>, StatusCode> {
     let users = sqlx::query_as!(
@@ -482,7 +724,17 @@ pub async fn get_users_by_ids(
     )
     .fetch_all(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|err| {
+        error!(error = %err, "[Database failure]: failure searching for user by id");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    info!(
+        action = "auth.search_user_by_id",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[INFO]: User searched for another but by id WOWIE"
+    );
 
     Ok(Json(users))
 }
