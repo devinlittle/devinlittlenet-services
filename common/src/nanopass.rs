@@ -26,7 +26,7 @@ pub struct RemoveSessionInternalInput {
 
 // nanopass structs
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema, PartialEq)]
 #[serde(tag = "type")]
 pub enum Visibility {
     #[schema(title = "Private")]

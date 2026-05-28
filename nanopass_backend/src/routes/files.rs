@@ -113,7 +113,20 @@ pub async fn modify_listing(
     match state.files.get(&req.id) {
         Some(listing) if listing.owner_id == user.uuid => {
             let owned = req.clone();
+
+            if listing.visibility != Visibility::Private && req.visibility == Visibility::Private {
+                state
+                    .broadcast_nanopass_event(
+                        &listing,
+                        common::nanopass::NanoPassPayload::ListingRemoved {
+                            listing: listing.clone(),
+                        },
+                    )
+                    .await;
+            }
+
             drop(listing);
+
             state.files.alter(&owned.id, |_, _| req);
 
             state
@@ -125,7 +138,7 @@ pub async fn modify_listing(
                 )
                 .await;
 
-            tracing::info!("{} motified a listing", &user.username);
+            tracing::info!("{} modified a listing", &user.username);
             StatusCode::OK
         }
         Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
