@@ -10,7 +10,7 @@ use constant_time_eq::constant_time_eq;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{types::uuid, PgPool};
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, info_span, instrument, warn, Instrument};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -52,6 +52,8 @@ pub async fn add_account_info(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<UpdateProfileInput>,
 ) -> StatusCode {
+    let db_span = info_span!("add_account_info_query");
+
     let result = sqlx::query!(
         r#"
         UPDATE users SET
@@ -66,6 +68,7 @@ pub async fn add_account_info(
         user.uuid
     )
     .execute(&pool)
+    .instrument(db_span)
     .await;
 
     match result {
@@ -120,8 +123,11 @@ pub async fn delete_handler(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("delete_user_query");
+
     match sqlx::query!("DELETE FROM users WHERE id = $1", user.uuid)
         .execute(&pool)
+        .instrument(db_span)
         .await
     {
         Ok(result) if result.rows_affected() > 0 => {
@@ -291,6 +297,8 @@ pub async fn list_active_sessions(
         return Err(StatusCode::UNAUTHORIZED);
     };
 
+    let db_span = info_span!("list_active_sessions_query");
+
     let sessions = sqlx::query!(
         "SELECT id, expires_at, user_agent, token_hash FROM refresh_tokens
         WHERE user_id = $1
@@ -298,6 +306,7 @@ pub async fn list_active_sessions(
         user.uuid
     )
     .fetch_all(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failed to grab all active sessions");
@@ -356,6 +365,8 @@ pub async fn revoke_all_sessions(
     State(pool): State<PgPool>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("revoke_all_sessions_query");
+
     match sqlx::query!(
         "DELETE FROM refresh_tokens
         WHERE replaced_by_token IS NULL
@@ -363,6 +374,7 @@ pub async fn revoke_all_sessions(
         user.uuid
     )
     .execute(&pool)
+    .instrument(db_span)
     .await
     {
         Ok(result) => {
@@ -425,6 +437,8 @@ pub async fn revoke_specific_session(
     Path(path): Path<Uuid>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("revoke_specific_session_query");
+
     match sqlx::query!(
         "DELETE FROM refresh_tokens
         WHERE replaced_by_token IS NULL
@@ -434,6 +448,7 @@ pub async fn revoke_specific_session(
         user.uuid,
     )
     .execute(&pool)
+    .instrument(db_span)
     .await
     {
         Ok(result) => {
@@ -492,6 +507,8 @@ pub async fn add_recovery_info(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<AddRecoveryInfoInputs>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("add_recovery_info_db_query");
+
     match sqlx::query!(
         r#"
         UPDATE users SET
@@ -503,6 +520,7 @@ pub async fn add_recovery_info(
         user.uuid
     )
     .execute(&pool)
+    .instrument(db_span)
     .await
     {
         Ok(_) => {
@@ -552,6 +570,8 @@ pub async fn verify_recovery_info(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<VerifyRecoveryInfoInputs>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("verify_recovery_info_query");
+
     let result = sqlx::query!(
         r#"
         SELECT recovery_hash, encrypted_private_key
@@ -560,6 +580,7 @@ pub async fn verify_recovery_info(
         user.uuid
     )
     .fetch_one(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failure grabbing recovery info from db");
@@ -665,6 +686,8 @@ pub async fn search_user(
 
     let query = format!("%{}%", search_query.q.trim());
 
+    let db_span = info_span!("search_user_query");
+
     let results = sqlx::query_as!(
         UserSearchResult,
         r#"
@@ -678,6 +701,7 @@ pub async fn search_user(
         user.uuid
     )
     .fetch_all(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failure searching for user");
@@ -724,6 +748,8 @@ pub async fn get_users_by_ids(
     Extension(user): Extension<AuthenticatedUser>,
     Json(req): Json<ByIdsInput>,
 ) -> Result<Json<Vec<UserSearchResult>>, StatusCode> {
+    let db_span = info_span!("get_users_by_ids_query");
+
     let users = sqlx::query_as!(
         UserSearchResult,
         r#"
@@ -734,6 +760,7 @@ pub async fn get_users_by_ids(
         &req.ids as &[Uuid]
     )
     .fetch_all(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failure searching for user by id");

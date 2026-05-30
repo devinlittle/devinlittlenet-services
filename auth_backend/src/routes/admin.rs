@@ -6,7 +6,7 @@ use axum::{
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, info_span, instrument, warn, Instrument};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -56,8 +56,11 @@ pub async fn list_users(
         return Err(StatusCode::FORBIDDEN);
     }
 
+    let db_span = info_span!("grab_user_query");
+
     let users = sqlx::query!("SELECT id, username, roles FROM users")
         .fetch_all(&pool)
+        .instrument(db_span)
         .await
         .map_err(|err| {
             error!(error = %err, "[Database failure]: failed to look up users during an admin list user req");
@@ -134,6 +137,8 @@ pub async fn change_role(
 
     let path = &[req.service.to_string().to_lowercase()];
 
+    let db_span = info_span!("update_user_query");
+
     sqlx::query!(
         "UPDATE users
      SET roles = jsonb_set(roles, $1, $2::jsonb)
@@ -143,6 +148,7 @@ pub async fn change_role(
         target_id
     )
     .execute(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failed to change user role");
@@ -202,6 +208,8 @@ pub async fn revoke_all_from_id(
         return Err(StatusCode::FORBIDDEN);
     }
 
+    let db_span = info_span!("delete_refresh_query");
+
     match sqlx::query!(
         "DELETE FROM refresh_tokens
         WHERE replaced_by_token IS NULL
@@ -209,6 +217,7 @@ pub async fn revoke_all_from_id(
         target_id
     )
     .execute(&pool)
+    .instrument(db_span)
     .await
     {
         Ok(result) => {
@@ -365,8 +374,11 @@ pub async fn delete_by_id(
         return Err(StatusCode::FORBIDDEN);
     }
 
+    let db_span = info_span!("delete_user_query");
+
     match sqlx::query!("DELETE FROM users WHERE id = $1", target_id)
         .execute(&pool)
+        .instrument(db_span)
         .await
     {
         Ok(result) if result.rows_affected() > 0 => {

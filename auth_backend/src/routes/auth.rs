@@ -13,7 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use hyper::{header::SET_COOKIE, HeaderMap};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use sqlx::{types::uuid, PgPool};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 use uuid::Uuid;
 
 use common::{
@@ -50,12 +50,16 @@ pub async fn register_handler(
     Json(req): Json<RegisterInput>,
 ) -> Result<Json<String>, axum::http::StatusCode> {
     let password_hash: String = hash_password(req.password)?;
+
+    let db_span = info_span!("register_user_query");
+
     let user_row = sqlx::query!(
         "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id",
         req.username,
         password_hash,
     )
     .fetch_one(&pool)
+    .instrument(db_span)
     .await
     .map_err(|_| axum::http::StatusCode::CONFLICT)?;
 
@@ -112,12 +116,15 @@ pub async fn login_handler(
     TypedHeader(user_agent): TypedHeader<UserAgent>,
     Json(req): Json<LoginInput>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    let db_span = info_span!("login_user_query");
+
     let row = sqlx::query_as!(
         UserRow,
         "SELECT id, password_hash, username, roles, public_key FROM users WHERE username = $1",
         &req.username
     )
     .fetch_optional(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failed to look up user during login");
@@ -261,11 +268,14 @@ pub async fn refresh_handler(
 
     let cookie_refresh_token = cookies.get("refresh_token").unwrap_or_default();
 
+    let first_db_span = info_span!("grab_old_token_query");
+
     let old_token_query = sqlx::query!(
         "SELECT user_id, token_hash FROM refresh_tokens WHERE token_hash = $1",
         hash(cookie_refresh_token)
     )
     .fetch_optional(&pool)
+    .instrument(first_db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "Failed to get user_id and token_hash from refresh tokens");
@@ -304,6 +314,8 @@ pub async fn refresh_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    let second_db_span = info_span!("update_token_query");
+
     sqlx::query!(
         "UPDATE refresh_tokens
          SET revoked_at = NOW(), replaced_by_token = $2
@@ -314,11 +326,14 @@ pub async fn refresh_handler(
         new_refresh_id,
     )
     .fetch_optional(&pool)
+    .instrument(second_db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: Failed to set old token as revoked");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    let third_db_span = info_span!("grab_user_query");
 
     let user = sqlx::query_as!(
         UserRow,
@@ -326,6 +341,7 @@ pub async fn refresh_handler(
         user_id
     )
     .fetch_one(&pool)
+    .instrument(third_db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: Failed to grab user info during token refresh");
@@ -416,11 +432,14 @@ pub async fn logout_handler(
     }
     let refresh_cookie = cookies.get("refresh_token").unwrap_or_default();
 
+    let db_span = info_span!("delete_refresh_query");
+
     let user_id = sqlx::query!(
         "DELETE FROM refresh_tokens WHERE token_hash = $1 RETURNING user_id",
         hash(refresh_cookie)
     )
     .fetch_one(&pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failed to delete refresh_token");
