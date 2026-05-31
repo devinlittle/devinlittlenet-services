@@ -101,7 +101,8 @@ pub async fn create_listing(
     ),
     responses(
         (status = 200, description = "listing modified"),
-        (status = 500, description = "uhmmm...failed"),
+        (status = 403, description = "the lisiting requested to modify is not the user's listing"),
+        (status = 404, description = "listing not found"),
     ),
     tag = "file_listings"
 )]
@@ -155,6 +156,8 @@ pub async fn modify_listing(
     ),
     responses(
         (status = 200, description = "listing removed"),
+        (status = 403, description = "the lisiting requested to remove is not the user's listing"),
+        (status = 404, description = "listing not found"),
         (status = 500, description = "uhmmm...failed"),
     ),
     tag = "file_listings"
