@@ -1,7 +1,7 @@
 use axum::{extract::State, Extension, Json};
 use crypto_utils::decrypt_string;
 use hyper::StatusCode;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, info_span, instrument, warn, Instrument};
 
 use crate::routes::AppState;
 
@@ -34,8 +34,11 @@ pub async fn grades_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<Json<GradesHashMap>, StatusCode> {
+    let db_span = info_span!("grades_query");
+
     let grades_row = sqlx::query!("SELECT grades FROM grades WHERE id = $1", user.uuid)
         .fetch_optional(&state.pool)
+        .instrument(db_span)
         .await
         .map_err(|err| {
             error!(error = %err, "[Database failure]: failed to grab grade info from db");
@@ -66,6 +69,12 @@ pub async fn grades_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    info!("Giving Grades to: {:?}", user.username);
+    info!(
+        action = "gradegetter_backend.fetch_grades",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "Gave grades to user",
+    );
+
     Ok(Json(grades))
 }

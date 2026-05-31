@@ -8,7 +8,7 @@ use axum::{
 use common::{gradegetter::SchoologyLogin, AuthenticatedUser};
 use crypto_utils::encrypt_string;
 use tokio::sync::watch::{self};
-use tracing::{error, info, instrument};
+use tracing::{error, info, info_span, instrument, Instrument};
 use uuid::Uuid;
 
 use crate::routes::AppState;
@@ -56,6 +56,8 @@ pub async fn add_schoology_credentials_handler(
         }
     };
 
+    let db_span = info_span!("add_schoology_credentials_query");
+
     sqlx::query!(
         "INSERT INTO schoology_auth (id, encrypted_email, encrypted_password) VALUES ($1, $2, $3)
          ON CONFLICT (id) DO UPDATE SET 
@@ -66,6 +68,7 @@ pub async fn add_schoology_credentials_handler(
         encrypted_password,
     )
     .execute(&state.pool)
+    .instrument(db_span)
     .await
     .map_err(|err| {
         error!(error = %err, "[Database failure]: failed to add schoology information to db");
@@ -108,8 +111,11 @@ pub async fn delete_schoology_credentials_handler(
     State(state): State<AppState>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> Result<StatusCode, StatusCode> {
+    let db_span = info_span!("delete_schoology_credentials_query");
+
     sqlx::query!("DELETE FROM schoology_auth WHERE id = $1", user.uuid)
         .execute(&state.pool)
+        .instrument(db_span)
         .await
         .map_err(|err| {
             error!(error = %err, "[Database failure]: failed to delete schoology information from db");
