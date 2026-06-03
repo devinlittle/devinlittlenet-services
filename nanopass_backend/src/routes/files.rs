@@ -1,6 +1,7 @@
 use axum::{extract::State, response::IntoResponse, Extension, Json};
 use chrono::Utc;
 use hyper::StatusCode;
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::routes::AppState;
@@ -10,6 +11,15 @@ use common::{
     AuthenticatedUser,
 };
 
+#[instrument(
+    name = "get_listings",
+    skip(state),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        user.session_id = %user.session_id,
+    )
+)]
 #[utoipa::path(
     get,
     path = "/listings",
@@ -38,9 +48,26 @@ pub async fn get_listings(
         })
         .map(|l| l.value().clone())
         .collect();
+
+    info!(
+        action = "nanopass.get_listings",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[INFO]: User fetched listings"
+    );
+
     Json(listings)
 }
 
+#[instrument(
+    name = "create_listing",
+    skip(state, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        user.session_id = %user.session_id,
+    )
+)]
 #[utoipa::path(
     post,
     path = "/listings",
@@ -85,13 +112,30 @@ pub async fn create_listing(
                 },
             )
             .await;
-        tracing::info!("{} added a new listing", &user.username);
+
+        info!(
+            action = "nanopass.create_listing",
+            user.id = %user.uuid,
+            user.username = %user.username,
+            "[INFO]: Posted a new listing"
+        );
+
         Json(file_listing).into_response()
     } else {
+        error!("couldn't create listing");
         StatusCode::INTERNAL_SERVER_ERROR.into_response()
     }
 }
 
+#[instrument(
+    name = "modify_listing",
+    skip(state, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        user.session_id = %user.session_id,
+    )
+)]
 #[utoipa::path(
     patch,
     path = "/listings",
@@ -139,14 +183,47 @@ pub async fn modify_listing(
                 )
                 .await;
 
-            tracing::info!("{} modified a listing", &user.username);
+            info!(
+                action = "nanopass.modify_listing",
+                user.id = %user.uuid,
+                user.username = %user.username,
+                "[INFO]: Modified a listing"
+            );
+
             StatusCode::OK
         }
-        Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
-        None => StatusCode::NOT_FOUND,
+        Some(_) => {
+            warn!(
+                action = "nanopass.modify_listing",
+                reason = "listing requested to modify isn't directly owned by user",
+                user.username = %user.username,
+                "[Security Alert]: Failed modify a listing that the requesting user doesn't own"
+            );
+
+            StatusCode::FORBIDDEN
+        } // thats not not your listing buddY
+        None => {
+            warn!(
+                action = "nanopass.modify_listing",
+                reason = "listing not found",
+                user.username = %user.username,
+                "[WARN]: Listing Not found yikes."
+            );
+
+            StatusCode::NOT_FOUND
+        }
     }
 }
 
+#[instrument(
+    name = "remove_listing",
+    skip(state, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        user.session_id = %user.session_id,
+    )
+)]
 #[utoipa::path(
     delete,
     path = "/listings",
@@ -182,14 +259,47 @@ pub async fn remove_listing(
                 )
                 .await;
 
-            tracing::info!("{} removed a listing", &user.username);
+            info!(
+                action = "nanopass.remove_listing",
+                user.id = %user.uuid,
+                user.username = %user.username,
+                "[INFO]: Removed a listing"
+            );
+
             StatusCode::OK
         }
-        Some(_) => StatusCode::FORBIDDEN, // thats not not your listing buddY
-        None => StatusCode::NOT_FOUND,
+        Some(_) => {
+            warn!(
+                action = "nanopass.remove_listing",
+                reason = "listing requested to remove isn't directly owned by user",
+                user.username = %user.username,
+                "[Security Alert]: Failed remove a listing that the requesting user doesn't own"
+            );
+
+            StatusCode::FORBIDDEN
+        } // thats not not your listing buddY
+        None => {
+            warn!(
+                action = "nanopass.remove_listing",
+                reason = "listing not found",
+                user.username = %user.username,
+                "[WARN]: Listing Not found yikes."
+            );
+
+            StatusCode::NOT_FOUND
+        }
     }
 }
 
+#[instrument(
+    name = "remove_all_listings",
+    skip(state, req),
+    fields(
+        user.username = %user.username,
+        user.id = %user.uuid,
+        user.session_id = %user.session_id,
+    )
+)]
 #[utoipa::path(
     delete,
     path = "/listings/session",
@@ -230,6 +340,12 @@ pub async fn remove_all_session_listings(
             .await
     }
 
-    tracing::info!("{} removed their listings", &user.username);
+    info!(
+        action = "nanopass.remove_all_listing",
+        user.id = %user.uuid,
+        user.username = %user.username,
+        "[INFO]: Removed all their listings"
+    );
+
     StatusCode::OK
 }

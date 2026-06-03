@@ -7,7 +7,6 @@ use tokio::signal::{
 };
 use tower_http::cors::CorsLayer;
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 
 mod middleware;
 mod routes;
@@ -15,9 +14,7 @@ mod utils;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
+    let _guard = common::tracing::init_tracing();
 
     rustls::crypto::ring::default_provider()
         .install_default()
