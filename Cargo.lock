@@ -720,6 +720,8 @@ dependencies = [
  "sqlx",
  "strum",
  "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -1488,6 +1490,10 @@ checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
 ]
+
+[[package]]
+name = "friendly_namer"
+version = "0.1.0"
 
 [[package]]
 name = "fs-err"

@@ -49,10 +49,14 @@ pub struct Claims {
 //#[serde(rename_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum ServiceName {
+    #[serde(alias = "Auth")]
+    Auth,
     #[serde(alias = "Global")]
     Global,
     #[serde(alias = "Gradegetter")]
     GradeGetter,
+    #[serde(alias = "GradeGetter_Backend")]
+    GradeGetterBackend,
     #[serde(alias = "Nanopass")]
     NanoPass,
     #[serde(alias = "Smalltalk")]
@@ -61,6 +65,8 @@ pub enum ServiceName {
     Notifications,
     #[serde(alias = "PodcastSchoolProject")]
     PodcastSchoolProject,
+    #[serde(alias = "Unknown")]
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug, ToSchema, strum::Display)]

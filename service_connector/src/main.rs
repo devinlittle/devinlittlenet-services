@@ -22,7 +22,7 @@ pub mod mesh {
 }
 
 use crate::mesh::service_connector::{
-    BootstrapSnapshot, ClientMessage, ServerMessage, SignalEnvelope,
+    BootstrapSnapshot, ClientMessage, PeerAnnouncement, ServerMessage, SignalEnvelope,
 };
 use common::tracing::init_tracing;
 use mesh::service_connector::mesh_network_service_server::{
@@ -181,11 +181,9 @@ impl MeshNetworkService for AppState {
                             if new_node_uuid == node_id { continue; }
 
                             let discovery_msg = ServerMessage {
-                                payload: Some(mesh::service_connector::server_message::Payload::Signal(
-                                    SignalEnvelope {
-                                        source_node_id: new_node_uuid.to_string(),
-                                        raw_json: r#"{"action": "connect_to_new_peer"}"#.to_string(),
-                                        target_node_id: node_id.to_string(),
+                                payload: Some(mesh::service_connector::server_message::Payload::Announcement(
+                                    PeerAnnouncement {
+                                            joined_node_id: new_node_uuid.to_string(),
                                     }
                                 )),
                             };

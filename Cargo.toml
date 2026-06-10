@@ -2,13 +2,15 @@
 resolver = "3"
 members = [
   "auth_backend/",
-  "notification_backend/",
   "gradegetter/gradegetter",
   "gradegetter/gradegetter_backend/",
-  "gradegetter/crypto_utils/",
+  "notification_backend/",
   "nanopass_backend/",
+  "smalltalk_backend",
   "common",
-  "smalltalk_backend", "service_connector"]
+  "service_connector",
+  "crates/crypto_utils",
+  "crates/friendly_namer"]
 
 
 [workspace.dependencies]
@@ -62,7 +64,7 @@ aes-gcm = "0.10"
 aes = "0.9"
 rand = "0.10"
 base64 = "0.22"
-crypto_utils = { path = "./gradegetter/crypto_utils" }
+crypto_utils = { path = "./crates/crypto_utils" }
 common = { path = "./common" }
 strum = { version = "0.28", features = ["derive"] }
 
