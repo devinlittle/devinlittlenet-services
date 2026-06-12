@@ -20,7 +20,7 @@ axum = {version = "0.8.9", features = ["macros"]}
 axum-extra = "0.12.6"
 axum-server = {version = "0.8", features = ["tls-rustls"]}
 axum-prometheus = "0.10"
-hyper = {version = "1.9.0"}
+hyper = {version = "1.10"}
 hyper-tls = "0.6.0"
 tower-http = { version = "0.6.11", features = ["cors"]}
 tower = "0.5.3"
@@ -32,7 +32,7 @@ tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 futures-util = "0.3.32"
 serde = {version = "1", features = ["derive"]}
 serde_json = {version = "1"}
-serde_with = { version = "3.0", features = ["chrono_0_4"] }
+serde_with = { version = "3", features = ["chrono_0_4"] }
 sha2 = {version = "0.11"}
 chrono = { version = "0.4", features = ["serde"] }
 argon2 = "0.5"
@@ -81,5 +81,3 @@ codegen-units = 1 # Compile crates one after another so the compiler can optimiz
 lto = true # Enables link to optimizations
 opt-level = 3 # Use all optimizations for best performance
 strip = true # Remove debug symbols
-
-
