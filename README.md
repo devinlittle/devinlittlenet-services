@@ -1,4 +1,7 @@
-# DevinLittle.net Services
+# PROJECT HAS MOVED TO [HERE](https://github.com/devinlittle/devinlittle-net)
+
+## DevinLittle.net Services
+
 
 ## WARNING, THIS IS BEING HEAVILY EDITED AND MAINTAINED RIGHT NOW
 
